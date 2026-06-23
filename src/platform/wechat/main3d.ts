@@ -1,9 +1,8 @@
-// 微信小游戏入口（3D 引擎自检 demo）。
-// 加载引擎内置的 playground3d 蓝图（几个 Mesh3D 物件原地自转），用原生 WebGL 后端上屏，
-// 证明 Apollo 引擎的 3D 数据路径（Mesh3D + collectRenderables + WebGLRenderer）在微信环境能跑。
-// 把 playground3dBlueprint 换成你自己的 Mesh3D 数据即得你的 3D 场景。
+// 微信小游戏入口（3D 引擎自检 demo · three.js）。
+// 用最成熟可靠的 three.js 后端（r162，含 WebGL1 回退 + weapp 适配垫片）渲染引擎的 Mesh3D 数据，
+// 加载 playground3d 蓝图（红/绿 box + 蓝 plane 自转）。把蓝图换成你的 Mesh3D 数据即得你的 3D 场景。
 
-import { createWechatGame } from './bootstrap.js';
+import { createWechatThreeGame } from './three-game.js';
 import { playground3dBlueprint } from '../../assembly/playground3d.assembly.js';
 
 const g = globalThis as unknown as { performance?: { now(): number } };
@@ -11,10 +10,9 @@ if (typeof g.performance === 'undefined' || typeof g.performance.now !== 'functi
   g.performance = { now: () => Date.now() };
 }
 
-const game = createWechatGame({
+const game = createWechatThreeGame({
   blueprint: playground3dBlueprint,
-  renderer: '3d',
-  background: '#0a0a14',
+  background: 0x0a0a14,
   tickRate: 60,
 });
 

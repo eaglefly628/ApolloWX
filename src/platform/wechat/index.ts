@@ -7,7 +7,10 @@
 export { createWechatGame } from './bootstrap.js';
 export type { WechatGame, WechatGameOptions } from './bootstrap.js';
 
-// 3D：原生 WebGL 后端 + 3D 演示蓝图（createWechatGame({ renderer: '3d', ... }) 即用）。
+// 3D（成熟可靠 · three.js）：weapp 适配垫片 + ThreeRenderer 引导。
+export { createWechatThreeGame, type WechatThreeGameOptions } from './three-game.js';
+export { installWeappAdapter, patchCanvas } from './adapter.js';
+// 3D（零依赖 lite）：原生 WebGL 后端（createWechatGame({ renderer: '3d', ... }) 即用）。
 export { WebGLRenderer, type WebGLRendererOptions } from '@renderer/webgl-renderer.js';
 export { playground3dBlueprint } from '../../assembly/playground3d.assembly.js';
 

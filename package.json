@@ -12,15 +12,17 @@
     "demo": "vite-node src/assembly/demo.run.ts",
     "build:weapp": "node scripts/build-weapp.mjs",
     "build:weapp:3d": "node scripts/build-weapp.mjs --3d",
+    "build:weapp:3d:min": "node scripts/build-weapp.mjs --3d --minify",
+    "build:weapp:3d-lite": "node scripts/build-weapp.mjs --3d-lite",
     "build:weapp:min": "node scripts/build-weapp.mjs --minify",
     "build": "tsc --noEmit && node scripts/build-weapp.mjs"
   },
   "dependencies": {
-    "three": "^0.184.0"
+    "three": "^0.162.0"
   },
   "devDependencies": {
     "@types/node": "^25.9.3",
-    "@types/three": "^0.184.1",
+    "@types/three": "^0.162.0",
     "esbuild": "^0.24.0",
     "happy-dom": "^20.10.6",
     "typescript": "^5.5.3",

@@ -27,7 +27,15 @@ const jsToTs = {
   name: 'js-to-ts',
   setup(b) {
     b.onResolve({ filter: /\.js$/ }, async (args) => {
-      if (args.kind === 'entry-point' || args.path.includes('node_modules')) return;
+      // 只处理本仓库源码的 .js→.ts 映射；node_modules（如 three 内部的 ./three.core.js）原样交默认解析。
+      if (
+        args.kind === 'entry-point' ||
+        args.path.includes('node_modules') ||
+        (args.resolveDir && args.resolveDir.includes('node_modules')) ||
+        (args.importer && args.importer.includes('node_modules'))
+      ) {
+        return;
+      }
       for (const ext of ['.ts', '.tsx']) {
         const candidate = args.path.replace(/\.js$/, ext);
         const res = await b.resolve(candidate, {
@@ -42,8 +50,13 @@ const jsToTs = {
   },
 };
 
-// 入口选择：--3d 打 3D demo（main3d.ts），缺省打 2D demo（main.ts）。两者都产出 weapp/game.js。
-const entry = process.argv.includes('--3d') ? 'src/platform/wechat/main3d.ts' : 'src/platform/wechat/main.ts';
+// 入口选择：--3d 打 three.js 3D demo；--3d-lite 打零依赖 WebGL 3D demo；缺省打 2D demo。
+// 三者都产出 weapp/game.js。
+const entry = process.argv.includes('--3d-lite')
+  ? 'src/platform/wechat/main3d-lite.ts'
+  : process.argv.includes('--3d')
+    ? 'src/platform/wechat/main3d.ts'
+    : 'src/platform/wechat/main.ts';
 
 await build({
   entryPoints: [r(entry)],
