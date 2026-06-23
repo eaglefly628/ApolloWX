@@ -53,7 +53,9 @@ const jsToTs = {
 
 // 入口选择：--ui 数据驱动 UI demo；--3d three.js 3D；--3d-lite 零依赖 WebGL 3D；缺省 2D。
 // 都产出 weapp/game.js。
-const entry = process.argv.includes('--ui-world')
+const entry = process.argv.includes('--ui-theme')
+  ? 'src/platform/wechat/main-ui-theme.ts'
+  : process.argv.includes('--ui-world')
   ? 'src/platform/wechat/main-ui-world.ts'
   : process.argv.includes('--ui')
   ? 'src/platform/wechat/main-ui.ts'

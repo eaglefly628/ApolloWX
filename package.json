@@ -16,6 +16,7 @@
     "build:weapp:3d-lite": "node scripts/build-weapp.mjs --3d-lite",
     "build:weapp:ui": "node scripts/build-weapp.mjs --ui",
     "build:weapp:ui-world": "node scripts/build-weapp.mjs --ui-world",
+    "build:weapp:ui-theme": "node scripts/build-weapp.mjs --ui-theme",
     "build:weapp:min": "node scripts/build-weapp.mjs --minify",
     "build": "tsc --noEmit && node scripts/build-weapp.mjs"
   },

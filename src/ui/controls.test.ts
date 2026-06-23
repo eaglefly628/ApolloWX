@@ -12,6 +12,7 @@ function fakeCtx() {
     textAlign: 'left' as CanvasTextAlign, textBaseline: 'alphabetic' as CanvasTextBaseline,
     save: noop, restore: noop, fillRect: noop, strokeRect: noop, fillText: noop,
     clearRect: noop, scale: noop, beginPath: noop, arc: noop, fill: noop, stroke: noop,
+    moveTo: noop, lineTo: noop, arcTo: noop, closePath: noop, rect: noop,
     drawImage: noop, measureText: () => ({ width: 40 }) as TextMetrics,
   };
   return ctx as unknown as CanvasRenderingContext2D;

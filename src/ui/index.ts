@@ -8,7 +8,10 @@ export type {
   ButtonProps, LabelProps, BadgeProps, TagProps, PanelProps, ScreenProps, TableProps,
   TableColumn, TableRow, ProgressBarProps, DropdownProps, InputProps, ImageProps,
 } from './components/types.js';
-export { DEFAULT_THEME } from './theme.js';
+export {
+  DEFAULT_THEME, THEMES, THEME_LABELS, getTheme,
+  DARK_THEME, CYBER_THEME, INK_THEME, BROCADE_THEME, SAKURA_THEME,
+} from './theme.js';
 export { layoutTree, hitTest, type Rect, type LaidOut, type LayoutOpts } from './layout.js';
 export { CanvasUI, type Hit, type CanvasUIRenderOpts } from './canvas-ui.js';
 export { resolveBindings, type ResourceView, type ResourceReader } from './bind.js';

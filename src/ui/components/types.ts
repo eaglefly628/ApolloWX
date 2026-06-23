@@ -190,4 +190,6 @@ export interface UITheme {
   gold: string;
   ok: string; okWash: string; warn: string; warnWash: string; danger: string;
   fontUi: string; fontMono: string;
+  /** 圆角半径 px（风格化扩展·可选）。缺省 0 = 直角。jade 三件套即"主强调色"，换色即换风格。 */
+  radius?: number;
 }

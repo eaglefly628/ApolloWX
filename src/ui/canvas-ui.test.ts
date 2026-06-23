@@ -13,6 +13,8 @@ function fakeCtx() {
     save() { calls.save++; }, restore() { calls.restore++; },
     fillRect() { calls.fillRect++; }, strokeRect() { calls.strokeRect++; },
     fillText() { calls.fillText++; }, clearRect() {}, scale() {},
+    beginPath() {}, moveTo() {}, lineTo() {}, arcTo() {}, arc() {}, closePath() {},
+    rect() {}, fill() { calls.fillRect++; }, stroke() { calls.strokeRect++; },
   };
   return { ctx: ctx as unknown as CanvasRenderingContext2D, calls };
 }

@@ -26,6 +26,8 @@ export interface WechatUI {
   redraw(): void;
   /** 同 redraw：世界变化后由引擎循环调用，重新解析绑定并重绘。 */
   refresh(): void;
+  /** 换肤：同一份 UI 数据换一套 UITheme 令牌并重绘。 */
+  setTheme(theme: UITheme): void;
   /** 飘字提示（非模态，定时自消）。对应网页 showToast。 */
   toast(text: string, tone?: ToastProps['tone'], duration?: number): void;
   /** 取消触摸监听。 */
@@ -47,8 +49,7 @@ export function createWechatUI(opts: WechatUIOptions): WechatUI {
   const ctx = canvas.getContext('2d');
   ctx.scale(dpr, dpr); // 逻辑坐标系绘制；触摸坐标即逻辑像素
 
-  const theme: UITheme = opts.theme ?? DEFAULT_THEME;
-  const ui = new CanvasUI(ctx, theme);
+  let ui = new CanvasUI(ctx, opts.theme ?? DEFAULT_THEME);
   const handlers = opts.handlers ?? {};
   const viewport = { x: 0, y: 0, w: W, h: H };
 
@@ -180,6 +181,7 @@ export function createWechatUI(opts: WechatUIOptions): WechatUI {
     setRoot: (r: LayoutNode) => { root = r; redraw(); },
     redraw,
     refresh: redraw,
+    setTheme: (th: UITheme) => { ui = new CanvasUI(ctx, th); redraw(); },
     toast: (text, tone, duration = 2600) => {
       currentToast = { text, tone };
       redraw();

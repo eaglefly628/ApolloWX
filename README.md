@@ -60,6 +60,7 @@ npm run build:weapp    # esbuild 打包引擎 → weapp/game.js
 | `npm run build:weapp:3d-lite` | 3D demo（零依赖原生 WebGL，包小、功能基础） |
 | `npm run build:weapp:ui` | **数据驱动 UI** demo（三页 Tabs 全控件） |
 | `npm run build:weapp:ui-world` | **UI 即游戏** demo（UI 绑定活的 ECS 世界 · 放置挖矿） |
+| `npm run build:weapp:ui-theme` | **UI 风格化** demo（同一份 UI 实时换 5 套皮） |
 | `npm run build:weapp:min` | 2D 构建 + 压缩 |
 | `npm run build` | 类型检查 + 构建微信产物（CI 全绿门槛） |
 
@@ -230,3 +231,18 @@ engine.start();
 攒金币升级采矿力（花费联动）。金币/采矿力/能量/花费全是 `bind` 的 Resource，随世界 tick 实时刷新。
 即「把 UI 当成一个游戏」：UI = 表现 + 输入，世界 = 确定性状态机。示例 `src/platform/wechat/main-ui-world.ts`、
 `src/assembly/ui-world.assembly.ts`。
+
+### 风格化（主题皮 · 实时换肤）
+
+**风格 = 数据（令牌），解释器不变**。`src/ui/theme.ts` 内置 5 套 `UITheme` 皮：
+`dark`(雅致) / `cyber`(赛博霓虹) / `ink`(水墨) / `brocade`(三国织锦) / `sakura`(樱花)。
+皮 = 颜色令牌 + `radius`(圆角风格)；`jade` 三件套即"主强调色"，换色即换风格。CanvasUI 按令牌绘制（支持圆角）。
+
+```ts
+import { getTheme } from '@ui/theme.js';
+const app = createWechatUI({ root, theme: getTheme('cyber') });
+app.setTheme(getTheme('sakura'));   // 运行时换肤，同一份 UI 数据零改
+```
+
+跑：`npm run build:weapp:ui-theme` —— 顶部一排标签切皮，同一份控件展板风格实时变（颜色 + 圆角）。
+自定义皮 = 传一份你自己的 `UITheme` 令牌即可。

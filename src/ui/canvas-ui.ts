@@ -76,7 +76,7 @@ export class CanvasUI {
     ctx.font = this.font(14, true);
     const w = Math.min(v.w - 40, Math.max(120, ctx.measureText(text).width + 40));
     const x = v.x + (v.w - w) / 2; const y = v.y + v.h - 80; const h = 38;
-    this.rect(t.bg3, x, y, w, h); this.stroke(c, x, y, w, h);
+    this.rrect(t.bg3, x, y, w, h); this.rstroke(c, x, y, w, h);
     ctx.fillStyle = c; this.text(text, x + w / 2, y + h / 2, 'center');
     ctx.restore();
   }
@@ -100,6 +100,26 @@ export class CanvasUI {
   }
   private region(hit: Hit, x: number, y: number, w: number, h: number): void {
     this.regions.push({ x, y, w, h, hit });
+  }
+  // 圆角矩形路径（不依赖 ctx.roundRect，wx 老基础库也可用）。
+  private path(x: number, y: number, w: number, h: number, r: number): void {
+    const ctx = this.ctx; const rr = Math.max(0, Math.min(r, w / 2, h / 2));
+    ctx.beginPath();
+    if (rr <= 0) { ctx.rect(x, y, w, h); return; }
+    ctx.moveTo(x + rr, y);
+    ctx.arcTo(x + w, y, x + w, y + h, rr);
+    ctx.arcTo(x + w, y + h, x, y + h, rr);
+    ctx.arcTo(x, y + h, x, y, rr);
+    ctx.arcTo(x, y, x + w, y, rr);
+    ctx.closePath();
+  }
+  private radius(): number { return this.theme.radius ?? 0; }
+  // 圆角填充 / 描边（控件表面用；背景/分隔/进度条仍用直角 rect）。
+  private rrect(c: string, x: number, y: number, w: number, h: number, r = this.radius()): void {
+    this.path(x, y, w, h, r); this.ctx.fillStyle = c; this.ctx.fill();
+  }
+  private rstroke(c: string, x: number, y: number, w: number, h: number, r = this.radius()): void {
+    this.path(x + 0.5, y + 0.5, w - 1, h - 1, r); this.ctx.strokeStyle = c; this.ctx.lineWidth = 1; this.ctx.stroke();
   }
 
   private draw(l: LaidOut): void {
@@ -131,7 +151,7 @@ export class CanvasUI {
 
   private drawPanel(node: LayoutNode, x: number, y: number, w: number, h: number): void {
     const t = this.theme; const p = node.props as PanelProps;
-    this.rect(t.bg1, x, y, w, h); this.stroke(t.line, x, y, w, h);
+    this.rrect(t.bg1, x, y, w, h); this.rstroke(t.line, x, y, w, h);
     if (p.title) {
       this.ctx.font = this.font(13, true); this.ctx.fillStyle = t.sub;
       this.text(p.title, x + 12, y + 15);
@@ -149,8 +169,8 @@ export class CanvasUI {
     const t = this.theme; const kind = p.kind ?? 'primary';
     const bg = p.disabled ? 'rgba(255,255,255,0.03)' : kind === 'primary' ? t.jadeWash : kind === 'ghost' ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0)';
     const fg = p.disabled ? t.dim : kind === 'primary' ? t.jade : t.sub;
-    this.rect(bg, x, y, w, h);
-    this.stroke(kind === 'primary' && !p.disabled ? t.jadeLine : t.line, x, y, w, h);
+    this.rrect(bg, x, y, w, h);
+    this.rstroke(kind === 'primary' && !p.disabled ? t.jadeLine : t.line, x, y, w, h);
     this.ctx.font = this.font(15, kind === 'primary'); this.ctx.fillStyle = fg;
     this.text(p.label, x + w / 2, y + h / 2, 'center');
     if (p.action && !p.disabled) this.region({ kind: 'action', action: p.action, arg: p.actionArg }, x, y, w, h);
@@ -160,15 +180,15 @@ export class CanvasUI {
     const t = this.theme;
     const c = p.tone === 'warn' ? t.warn : p.tone === 'dim' ? t.dim : t.ok;
     const wash = p.tone === 'warn' ? t.warnWash : p.tone === 'dim' ? 'rgba(255,255,255,0.04)' : t.okWash;
-    this.rect(wash, x, y, w, h);
+    this.rrect(wash, x, y, w, h);
     this.ctx.font = this.font(12, true); this.ctx.fillStyle = c;
     this.text(p.text, x + w / 2, y + h / 2, 'center');
   }
 
   private drawTag(node: LayoutNode, x: number, y: number, w: number, h: number): void {
     const t = this.theme; const p = node.props as TagProps;
-    this.rect(p.active ? t.jadeWash : 'rgba(255,255,255,0.04)', x, y, w, h);
-    this.stroke(p.active ? t.jadeLine : t.line, x, y, w, h);
+    this.rrect(p.active ? t.jadeWash : 'rgba(255,255,255,0.04)', x, y, w, h);
+    this.rstroke(p.active ? t.jadeLine : t.line, x, y, w, h);
     this.ctx.font = this.font(13, p.active); this.ctx.fillStyle = p.active ? t.jade : t.sub;
     this.text(p.removable ? `${p.label}  ×` : p.label, x + w / 2, y + h / 2, 'center');
     if (p.action) this.region({ kind: 'action', action: p.action, arg: p.actionArg }, x, y, w, h);
@@ -221,7 +241,7 @@ export class CanvasUI {
   private drawDropdown(node: LayoutNode, x: number, y: number, w: number, h: number): void {
     const t = this.theme; const p = node.props as DropdownProps;
     const sel = p.options.find((o) => o.value === p.value);
-    this.rect(t.bg2, x, y, w, h); this.stroke(t.line, x, y, w, h);
+    this.rrect(t.bg2, x, y, w, h); this.rstroke(t.line, x, y, w, h);
     this.ctx.font = this.font(14); this.ctx.fillStyle = sel ? t.text : t.dim;
     this.text(sel ? sel.label : (p.placeholder ?? '请选择'), x + 10, y + h / 2);
     this.ctx.fillStyle = t.sub; this.text('▼', x + w - 18, y + h / 2);
@@ -232,7 +252,7 @@ export class CanvasUI {
   private drawDropdownPopup(d: { rect: Rect; node: LayoutNode }): void {
     const t = this.theme; const p = d.node.props as DropdownProps; const { x, y, w, h } = d.rect;
     const itemH = 36; const py = y + h + 2;
-    this.rect(t.bg3, x, py, w, p.options.length * itemH); this.stroke(t.jadeLine, x, py, w, p.options.length * itemH);
+    this.rrect(t.bg3, x, py, w, p.options.length * itemH); this.rstroke(t.jadeLine, x, py, w, p.options.length * itemH);
     p.options.forEach((o, i) => {
       const iy = py + i * itemH;
       this.ctx.font = this.font(14); this.ctx.fillStyle = o.value === p.value ? t.jade : t.text;
@@ -245,7 +265,7 @@ export class CanvasUI {
 
   private drawInput(node: LayoutNode, x: number, y: number, w: number, h: number): void {
     const t = this.theme; const p = node.props as InputProps;
-    this.rect(t.bg2, x, y, w, h); this.stroke(t.line, x, y, w, h);
+    this.rrect(t.bg2, x, y, w, h); this.rstroke(t.line, x, y, w, h);
     this.ctx.font = this.font(14); this.ctx.fillStyle = p.value ? t.text : t.dim;
     this.text(p.value || p.placeholder || '', x + 10, y + h / 2);
     this.region({ kind: 'input', action: p.action, value: p.value ?? '' }, x, y, w, h);
@@ -292,7 +312,7 @@ export class CanvasUI {
   private drawToast(p: ToastProps, x: number, y: number, w: number, h: number): void {
     const t = this.theme;
     const c = p.tone === 'warn' ? t.warn : p.tone === 'danger' ? t.danger : p.tone === 'dim' ? t.dim : p.tone === 'accent' ? t.jade : t.ok;
-    this.rect(t.bg3, x, y, w, h); this.stroke(c, x, y, w, h);
+    this.rrect(t.bg3, x, y, w, h); this.rstroke(c, x, y, w, h);
     this.ctx.font = this.font(13, true); this.ctx.fillStyle = c;
     this.text(p.text, x + w / 2, y + h / 2, 'center');
   }
@@ -303,7 +323,7 @@ export class CanvasUI {
     this.rect('rgba(0,0,0,0.55)', v.x, v.y, v.w, v.h);
     this.region({ kind: 'modalClose', action: p.closeAction }, v.x, v.y, v.w, v.h);
     // 居中盒 + 吸收热区（点盒身不关闭）。
-    this.rect(t.bg1, x, y, w, h); this.stroke(t.jadeLine, x, y, w, h);
+    this.rrect(t.bg1, x, y, w, h); this.rstroke(t.jadeLine, x, y, w, h);
     this.region({ kind: 'absorb' }, x, y, w, h);
     if (p.title) { this.ctx.font = this.font(15, true); this.ctx.fillStyle = t.text; this.text(p.title, x + 14, y + 16); this.rect(t.line, x + 1, y + 28, w - 2, 1); }
     if (p.closable !== false) {
