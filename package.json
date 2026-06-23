@@ -11,6 +11,7 @@
     "test:watch": "vitest",
     "demo": "vite-node src/assembly/demo.run.ts",
     "build:weapp": "node scripts/build-weapp.mjs",
+    "build:weapp:3d": "node scripts/build-weapp.mjs --3d",
     "build:weapp:min": "node scripts/build-weapp.mjs --minify",
     "build": "tsc --noEmit && node scripts/build-weapp.mjs"
   },

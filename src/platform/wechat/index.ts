@@ -7,6 +7,10 @@
 export { createWechatGame } from './bootstrap.js';
 export type { WechatGame, WechatGameOptions } from './bootstrap.js';
 
+// 3D：原生 WebGL 后端 + 3D 演示蓝图（createWechatGame({ renderer: '3d', ... }) 即用）。
+export { WebGLRenderer, type WebGLRendererOptions } from '@renderer/webgl-renderer.js';
+export { playground3dBlueprint } from '../../assembly/playground3d.assembly.js';
+
 export { WechatStoragePort } from './storage.js';
 export { WechatAudioPort } from './audio.js';
 export { WechatImageAssetLoader } from './image-loader.js';

@@ -8,6 +8,10 @@ export { AsciiRenderer } from './ascii-renderer.js';
 export type { AsciiRendererOptions } from './ascii-renderer.js';
 export { CanvasRenderer } from './canvas-renderer.js';
 export type { CanvasRendererOptions } from './canvas-renderer.js';
+// 原生 WebGL 3D 后端（**零依赖**，可进 barrel——不像 ThreeRenderer 静态 import three）。
+// 消费同一份 Renderable + Mesh3D，用裸 WebGL 画 box/plane；微信小游戏 3D 默认走它。
+export { WebGLRenderer } from './webgl-renderer.js';
+export type { WebGLRendererOptions } from './webgl-renderer.js';
 // SVG 帧投影（无头「截图」：确定 / 可版本控制 / 浏览器可看 / 可文本 diff —— 视觉回归 + 看帧用）。
 export { frameSvg } from './frame-svg.js';
 export type { FrameSvgOptions } from './frame-svg.js';

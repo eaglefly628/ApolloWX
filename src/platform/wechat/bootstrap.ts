@@ -1,5 +1,7 @@
 import { Engine } from '@runtime/engine.js';
 import { CanvasRenderer } from '@renderer/canvas-renderer.js';
+import { WebGLRenderer } from '@renderer/webgl-renderer.js';
+import type { RendererBackend } from '@engine/core/types.js';
 import type { WorldBlueprint } from '../../assembly/demo.assembly.js';
 import type { AssetManager } from '@assets/index.js';
 import { WechatTouchInputSource, type WechatTouchOptions } from './input.js';
@@ -10,7 +12,9 @@ export interface WechatGameOptions {
   blueprint: WorldBlueprint;
   /** 模拟频率（Hz）。固定步长 → 任何刷新率下一个 tick 都是同份模拟时间。默认 60。 */
   tickRate?: number;
-  /** 画布背景色。默认深色；'transparent' 则不铺底。 */
+  /** 渲染后端：'2d'=Canvas2D（默认），'3d'=原生 WebGL（Mesh3D / 着色块）。 */
+  renderer?: '2d' | '3d';
+  /** 画布背景色。2D 用 CSS 色串（'#rrggbb' / 'transparent'）；3D 自动解析 '#rrggbb' 为颜色。默认深色。 */
   background?: string;
   /** 逻辑分辨率。默认取屏幕逻辑尺寸（windowWidth/Height）。 */
   width?: number;
@@ -23,7 +27,7 @@ export interface WechatGameOptions {
 
 export interface WechatGame {
   engine: Engine;
-  renderer: CanvasRenderer;
+  renderer: RendererBackend;
   canvas: WxCanvas;
   input: WechatTouchInputSource | null;
   /** 屏幕/画布信息（逆投影、UI 布局用）。 */
@@ -45,13 +49,21 @@ export function createWechatGame(opts: WechatGameOptions): WechatGame {
   // 首个 wx.createCanvas() 即上屏主画布。
   const canvas = wx.createCanvas();
 
-  const renderer = new CanvasRenderer({
-    canvas: canvas as unknown as HTMLCanvasElement,
-    width,
-    height,
-    background: opts.background,
-    assets: opts.assets,
-  });
+  const renderer: RendererBackend =
+    opts.renderer === '3d'
+      ? new WebGLRenderer({
+          canvas: canvas as unknown as HTMLCanvasElement,
+          width,
+          height,
+          background: parseHexColor(opts.background),
+        })
+      : new CanvasRenderer({
+          canvas: canvas as unknown as HTMLCanvasElement,
+          width,
+          height,
+          background: opts.background,
+          assets: opts.assets,
+        });
 
   let input: WechatTouchInputSource | null = null;
   if (opts.touch) {
@@ -78,4 +90,12 @@ export function createWechatGame(opts: WechatGameOptions): WechatGame {
     start: () => engine.start(),
     stop: () => engine.stop(),
   };
+}
+
+// '#rrggbb' / 'rrggbb' → 0xRRGGBB；缺省/非法 → 深色默认。供 WebGL 背景用。
+function parseHexColor(css: string | undefined): number {
+  if (!css) return 0x0a0a14;
+  const hex = css.replace('#', '');
+  const n = parseInt(hex, 16);
+  return Number.isFinite(n) && hex.length >= 6 ? n & 0xffffff : 0x0a0a14;
 }

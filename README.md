@@ -54,8 +54,9 @@ npm run build:weapp    # esbuild 打包引擎 → weapp/game.js
 | `npm run typecheck` | TypeScript 类型检查（`tsc --noEmit`，exit 0） |
 | `npm run test` | 全部单测（vitest，976 passed / 129 files） |
 | `npm run demo` | 无头跑引擎：ASCII 可视化 + skill 协作日志 + record/replay 校验 |
-| `npm run build:weapp` | 构建微信小游戏产物 → `weapp/game.js` |
-| `npm run build:weapp:min` | 同上 + 压缩 |
+| `npm run build:weapp` | 构建微信小游戏产物（2D demo）→ `weapp/game.js` |
+| `npm run build:weapp:3d` | 构建 **3D** demo（原生 WebGL，自转的 Mesh3D 物件）→ `weapp/game.js` |
+| `npm run build:weapp:min` | 2D 构建 + 压缩 |
 | `npm run build` | 类型检查 + 构建微信产物（CI 全绿门槛） |
 
 ## 项目结构
@@ -109,3 +110,37 @@ game.start();
 
 把 `src/platform/wechat/main.ts` 里的 `playgroundBlueprint` 换成你的蓝图，`npm run build:weapp` 即可。
 更多能力见 `wiki/skills/index.md`（按分类查原子/Tier skill）。
+
+## 3D（基础）
+
+引擎把 **3D 也当数据**：给实体挂 `Mesh3D` 组件（`box` / `plane` + 尺寸 + 颜色 + 翻面轴），
+位姿取自同实体的 `Transform`，与 2D 实体**同场混排**（per-object opt-in 3D，不是整场景 3D）。
+
+微信小游戏的 3D 走**零依赖的原生 WebGL 后端** `WebGLRenderer`（`src/renderer/webgl-renderer.ts`）：
+裸 WebGL 调用 + 注入的 `wx.createCanvas()`，**保证能在微信跑、打包小**，投影/几何复用引擎已单测的
+`three-projection` 纯函数。（仓库里也保留了功能更全的 `ThreeRenderer`/three.js 后端供浏览器用，但
+它在微信需整套 `weapp-adapter` 垫片，故不作微信默认路径。）
+
+```ts
+import { createWechatGame } from '@platform/wechat/index.js';
+
+createWechatGame({
+  renderer: '3d',
+  background: '#0a0a14',
+  blueprint: {
+    capabilities: [/* transform / velocity / rotation-apply 等 */],
+    entities: {
+      cube: {
+        Transform: { x: 0, y: 0, rotation: 0, scaleX: 1, scaleY: 1 },
+        Velocity:  { vx: 0, vy: 0, angular: 0.03 },         // 自转
+        Mesh3D:    { shape: 'box', width: 80, height: 80, depth: 80, frontTint: 0xef4444, flipAxis: 'y' },
+      },
+    },
+  },
+}).start();
+```
+
+跑 3D demo：`npm run build:weapp:3d` → 微信开发者工具打开 `weapp/`，可见三个自转的 3D 物件
+（红 box / 绿 box / 蓝 plane），相机自动取景。示例蓝图见 `src/assembly/playground3d.assembly.ts`。
+
+> 基础后端用 `frontTint` 单色 + 方向光区分各面；`backTint` / `edgeTint` / 贴图属进阶，暂未实现。

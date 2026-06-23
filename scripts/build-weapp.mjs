@@ -42,8 +42,11 @@ const jsToTs = {
   },
 };
 
+// 入口选择：--3d 打 3D demo（main3d.ts），缺省打 2D demo（main.ts）。两者都产出 weapp/game.js。
+const entry = process.argv.includes('--3d') ? 'src/platform/wechat/main3d.ts' : 'src/platform/wechat/main.ts';
+
 await build({
-  entryPoints: [r('src/platform/wechat/main.ts')],
+  entryPoints: [r(entry)],
   outfile: r('weapp/game.js'),
   bundle: true,
   format: 'iife', // 微信小游戏 game.js 作为脚本自执行
@@ -59,4 +62,4 @@ await build({
   logLevel: 'info',
 });
 
-console.log('✓ 微信小游戏已构建 → weapp/game.js（用微信开发者工具打开 weapp/ 目录）');
+console.log(`✓ 微信小游戏已构建 → weapp/game.js（入口 ${entry}；用微信开发者工具打开 weapp/ 目录）`);
