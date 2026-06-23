@@ -1,0 +1,1863 @@
+# ════════════════════════════════════════════════════════════
+#  Apollo Engine — 游戏开发技能知识库（完整合并版）
+#  生成时间：2026-06-03 16:20
+#  模块数量：23
+#  用途：供项目经理 review 的完整导出
+# ════════════════════════════════════════════════════════════
+
+
+# ──────────────────────────────────────────────────────────
+# FILE: wiki/skills/index.md
+# ──────────────────────────────────────────────────────────
+
+# Apollo 游戏开发技能索引
+
+> Level 0 — 常驻加载。当你需要实现某类功能时，用 Read 工具读取对应文件。
+
+| 分类 | 覆盖原子/主题 | 触发场景 | 路径 |
+|------|-------------|---------|------|
+| ECS 架构 | defineCapability, World, Assembly | 新建 skill / 修改引擎结构 | wiki/skills/ecs-architecture.md |
+| 运动 | motion-apply, accel-apply, hierarchy | 实现位移/加速/父子跟随 | wiki/skills/motion.md |
+| 碰撞 | overlap-detect, collision-separate, bounce | 实现碰撞检测或响应 | wiki/skills/collision.md |
+| 物理 | gravity, friction, mass | 实现重力/摩擦/质量相关 | wiki/skills/physics.md |
+| 动画 | animation, frame, anim-state-machine | 实现帧动画/状态机动画 | wiki/skills/animation.md |
+| 输入 | input-capture, action-map, controllable | 处理键盘/触屏/手柄输入 | wiki/skills/input.md |
+| 渲染 | sprite, camera, text, color, visibility | 渲染层/画面/UI 显示 | wiki/skills/rendering.md |
+| 生命周期 | spawn, destroy, timer, lifetime | 实体创建/销毁/计时 | wiki/skills/lifecycle.md |
+| AI 行为 | ai-patrol, ai-chase, state, dialogue | 实现 NPC 行为/决策 | wiki/skills/ai-behavior.md |
+| 资源系统 | resource, resource-modify, damage-number | 血量/MP/伤害数字/UI 绑定 | wiki/skills/resource.md |
+| 空间查询 | spatial-query, range-detect, trigger-zone | 范围检测/空间分区 | wiki/skills/spatial.md |
+| 网络同步 | random-seed, lockstep, determinism | 联机/确定性/帧同步 | wiki/skills/networking.md |
+| 乙游扩展 | check.resolve, love-interest, settlement | Tier 3/4 乙游玩法方向 | wiki/skills/otome.md |
+| 序列化 | 存档/读档, JSON, 二进制, 版本迁移 | 实现存档/状态快照 | wiki/skills/serialization.md |
+| TypeScript | 判别联合, branded type, 泛型, 性能 | TS 类型设计/模式选择 | wiki/skills/typescript-patterns.md |
+| UI 系统 | HUD, 菜单, 对话框, React 集成 | 实现游戏界面/交互 | wiki/skills/ui-system.md |
+| 音频 | Web Audio, SFX, BGM, 空间音效 | 实现音效/音乐播放 | wiki/skills/audio.md |
+| 场景管理 | 场景切换, 关卡加载, 游戏状态机 | 实现多场景/关卡系统 | wiki/skills/scene-management.md |
+| 瓦片地图 | Tilemap, Tiled, 图块碰撞, 自动图块 | 实现瓦片关卡 | wiki/skills/tilemap.md |
+| 数学工具 | 向量, lerp, easing, 角度, PRNG | 数学运算/插值/缓动 | wiki/skills/math-utils.md |
+| 性能优化 | GC 回避, 批处理, DoD, 剖析 | 性能瓶颈/帧预算优化 | wiki/skills/performance.md |
+| 资源加载 | 图集, 预加载, 异步加载, 缓存 | 实现资源管理/加载流程 | wiki/skills/asset-loading.md |
+| 粒子系统 | 发射器, 粒子池, 视觉特效 | 实现爆炸/烟雾/拖尾等特效 | wiki/skills/particles.md |
+
+## 使用规则
+
+1. **不要一次性读取所有文件** — 只读当前任务涉及的分类
+2. 每个文件包含：核心原则、编码约定、常见陷阱、前沿技术、参考来源
+3. 具体算法实现不在此收录 — 需要时用 WebSearch 查询
+4. 共 23 个模块，按需加载单个模块约 60-80 行（≈1000 tokens）
+
+
+# ──────────────────────────────────────────────────────────
+# FILE: wiki/skills/ecs-architecture.md
+# ──────────────────────────────────────────────────────────
+
+# ECS 架构知识
+
+> 覆盖：defineCapability、World、Assembly、拓扑排序、组件语义
+
+## 核心原则
+
+- **Entity = ID**，没有逻辑。Component = 纯数据，没有方法。System = 纯逻辑，没有状态。
+- 组合代替继承：一个实体的行为完全由它挂载的 Component 集合决定。
+- 每个 System 通过 `defineCapability` 自描述它读什么、写什么，引擎用拓扑排序自动排执行顺序。
+
+## 编码约定
+
+- 每种 Component type 在一个实体上只存一份（Map<type, Component>）。
+- 事件型组件（ResourceModify、TimerDone、StateChanged）用 read-then-consume 模式：下游系统读取后移除。
+- Assembly 蓝图是纯声明式数据（实体 + 组件列表），不包含逻辑代码。
+
+## 组件语义分类
+
+| 类别 | 含义 | 生命周期 |
+|------|------|---------|
+| Resource | 持久数值 { current, min, max } | 长期存在 |
+| Event | 一次性信号 | 被消费后移除 |
+| Intent | "想做某事"的请求 | 被处理后移除 |
+| Marker | 无字段，存在即有意义 | 按需添加/移除 |
+| Config | 持久配置 | 不变 |
+| Render | 驱动渲染层 | 每帧更新 |
+
+## 常见陷阱
+
+- System 之间不要直接调用，只通过 Component 通信。
+- 不要在 System 内缓存 Entity 引用 — Entity 可能被 destroy。
+- Assembly 蓝图里的数值要可调，不要硬编码到 System 里。
+
+## 参考来源
+
+- 守望先锋 ECS (GDC 2017) — 工业级 ECS 的确定性设计
+- 地牢围攻数据驱动系统 (GDC 2002) — defineCapability 模式的理论源头
+- Dead Cells ECS — 实体池化 + 组件重用的实战案例
+
+
+# ──────────────────────────────────────────────────────────
+# FILE: wiki/skills/motion.md
+# ──────────────────────────────────────────────────────────
+
+# 运动模块知识
+
+> 覆盖原子：motion-apply、accel-apply、hierarchy-resolve
+
+## 核心原则
+
+- **半隐式欧拉积分**：先更新速度（v += a），再更新位置（p += v）。顺序不能反。
+- 定步长 tick：所有运动按固定 tick 推进，不用 dt 乘法。World 没有 deltaTime 概念。
+- 整数/定点坐标优先：浮点数会累积漂移，确定性重放时两端不一致。能用整数就不用浮点。
+
+## 编码约定
+
+- motion-apply 只做一件事：把 Velocity 加到 Transform 上。不做边界检查、不做碰撞。
+- accel-apply 只做一件事：把 Acceleration 加到 Velocity 上。不做重力（重力有单独 skill）。
+- hierarchy-resolve 用脏标记 + 延迟求解：只有父级 Transform 变了才重算子级。
+
+## 子步进（Sub-stepping）
+
+高速物体（子弹）一帧移动距离可能超过自身体积，导致穿透。解决方案：
+- 把一次大位移拆成多次小位移，每步做碰撞检测。
+- 或用射线检测（raycast）代替离散位移。
+- Apollo 当前用离散步进，高速场景需加子步进。
+
+## 常见陷阱
+
+- 不要用 `Math.hypot` — 它在不同平台实现不同，破坏确定性。用 `Math.sqrt(x*x + y*y)`。
+- 不要在 motion-apply 里读 Acceleration — 职责分离，accel-apply 负责。
+- hierarchy 的矩阵乘法不要每帧全量算 — 用脏标记判断是否需要更新。
+
+## 参考来源
+
+- Celeste 整数物理：platformer 手感的黄金标准
+- *Game Programming Patterns* Ch.2 Game Loop：定步长循环设计
+- *Game Physics Engine Development* (Millington) Ch.3：显式 vs 半隐式欧拉对比
+
+
+# ──────────────────────────────────────────────────────────
+# FILE: wiki/skills/collision.md
+# ──────────────────────────────────────────────────────────
+
+# 碰撞模块知识
+
+> 覆盖原子：overlap-detect、collision-separate、collision-bounce
+
+## 核心原则
+
+- 碰撞分两阶段：**宽相位**（broad phase）快速排除不可能碰的对，**窄相位**（narrow phase）精确计算穿透。
+- 宽相位用空间分区（网格或 AABB 树），窄相位用 AABB 重叠检测。
+- 碰撞响应和碰撞检测是两个独立 skill — 检测只输出 Overlap 组件，响应读取 Overlap 再行动。
+
+## AABB 重叠检测
+
+两个轴对齐矩形重叠条件：四个边界都有交集。
+- overlapX = min(right1, right2) - max(left1, left2)
+- overlapY = min(bottom1, bottom2) - max(top1, top2)
+- 两个 overlap 都 > 0 才算碰撞
+- 穿透法线取 overlap 较小的轴方向
+
+## 分离（Separation）
+
+- 按质量比分配推开距离：质量大的少动，质量小的多动。
+- mass = 0 表示不可移动（地面、墙壁），对方承受全部推开。
+- 分离公式：偏移 = normal × depth × (对方mass / 总mass)
+
+## 弹性碰撞（Bounce）
+
+- 反射速度 = v - 2(v·n)n × restitution
+- restitution = 0：完全非弹性（贴住）；restitution = 1：完全弹性（等速反弹）
+- 先做分离再做弹跳，顺序不能反。
+
+## 碰撞层过滤
+
+- 用 Tag 组件的 bitmask 做层过滤：只有指定 tag 组合才产生碰撞。
+- 常见分层：ground、player、enemy、projectile、trigger。
+- trigger 层只检测重叠，不产生物理响应。
+
+## 常见陷阱
+
+- 浮点精度导致"卡墙"：分离后下一帧又检测到微小穿透，反复弹跳。加一个极小的分离余量（skin width）。
+- 多实体堆叠时的求解顺序：先解静态碰撞（地面），再解动态碰撞（实体间）。
+- 不要在碰撞检测 System 里直接修改 Transform — 输出 Overlap 组件，由 collision-separate 统一处理。
+
+## 参考来源
+
+- *Real-Time Collision Detection* (Ericson) Ch.4 — AABB 碰撞的权威参考
+- Box2D v3 Position Solver — 工业级分离求解
+- Celeste 碰撞系统 — platformer 场景的最佳实践
+- Hollow Knight — Unity 2D Physics + 自定义碰撞层
+
+
+# ──────────────────────────────────────────────────────────
+# FILE: wiki/skills/physics.md
+# ──────────────────────────────────────────────────────────
+
+# 物理模块知识
+
+> 覆盖原子：gravity、friction、mass
+
+## 核心原则
+
+- **重力是常量加速度，不是力**。直接写 `acceleration.ay += gravityValue`，不走 F=ma 积分。
+- 摩擦是速度方向的反向加速度，clamp 到零（不能让摩擦把物体推回去）。
+- mass = 0 表示不可移动的静态物体。碰撞时静态物体不受任何影响。
+
+## 可变重力（Jump Feel）
+
+platformer 的跳跃手感核心：上升和下落用不同的重力值。
+- 上升阶段（vy < 0）：用较小的重力，让角色"飘"一下。
+- 下落阶段（vy > 0）：用较大的重力（通常 2-3 倍），让下落更"脆"。
+- 松开跳跃键时立即切到大重力 — 短按轻跳、长按高跳。
+
+## 摩擦模型
+
+库仑摩擦的游戏简化版：
+- 地面摩擦：每 tick 把水平速度乘一个衰减系数（0.8-0.95）。
+- 空中摩擦：衰减系数接近 1（几乎无摩擦），保持空中操控感。
+- 注意 clamp：`if (Math.abs(vx) < threshold) vx = 0`，避免无限微小滑动。
+
+## 常见陷阱
+
+- 重力不要加在 accel-apply 里 — gravity 是独立 skill，写入 Acceleration 组件，由 accel-apply 统一处理。
+- 不要给静态物体（mass=0）累加重力 — 它们不该受力。
+- 摩擦和输入加速度的交互：摩擦在 motion-apply 之前，输入加速度在 accel-apply 时。注意执行顺序。
+
+## 参考来源
+
+- Celeste 跳跃调优 — 可变重力的标准实现
+- Box2D v3 摩擦模型 — 库仑摩擦在碰撞接触点的实现
+- *Game Physics Cookbook* (Szauer) — 简化摩擦公式推导
+
+
+# ──────────────────────────────────────────────────────────
+# FILE: wiki/skills/animation.md
+# ──────────────────────────────────────────────────────────
+
+# 动画模块知识
+
+> 覆盖原子：animation (frame)、anim-state-machine
+
+## 核心原则
+
+- 帧动画是 timer → frame index 的直接映射：计时器 tick，到时切下一帧。
+- 动画状态机管理"什么时候播什么动画"：state(idle/run/jump) + 转换规则 + 对应动画。
+- 动画数据和游戏逻辑完全分离 — 动画 System 只读 State 和 Timer，不写 Velocity 等游戏组件。
+
+## 帧动画
+
+- Frame 组件：{ index, total }。每次 Timer 触发，index = (index + 1) % total。
+- 播放速度通过 Timer.duration 控制，不是通过跳帧。
+- 非循环动画：播到 total-1 停止，发出 TimerDone 事件。
+
+## 动画状态机
+
+- 每个状态绑定一个动画序列。
+- 转换规则基于游戏状态：grounded + vx!=0 → run，!grounded → jump，vx==0 → idle。
+- 转换时重置 Frame.index = 0。
+- 双轨道混合：身体动画 + 表情动画可以独立控制（用不同的 fsmId）。
+
+## 骨骼动画（扩展层）
+
+- **Spine**：骨骼 + 插值，适合动作类（Hollow Knight、Dead Cells、Hades）。
+  - 集成方式：Spine 输出姿态快照 → 写入扩展组件 → 渲染层读取。
+- **Live2D**：网格变形，适合少量高品质立绘（明日方舟、碧蓝航线、乙游）。
+  - 集成方式：参数快照模式，每帧把 ECS 状态映射为 Live2D 参数。
+  - 性能注意：一个 Live2D 模型的开销远大于 Spine，同屏数量有限。
+
+## 常见陷阱
+
+- 动画切换时忘记重置帧计数器 — 导致新动画从中间帧开始播。
+- 状态机转换条件写太宽松 — 导致动画在两个状态间快速抖动。加一个最小停留时间。
+- 不要用动画 System 驱动游戏逻辑（"攻击帧到了才出伤害"）— 应该反过来，用 Timer 事件触发伤害，动画只是视觉表现。
+
+## 参考来源
+
+- *Game Programming Patterns* Ch.14 Type Object — 帧动画的数据驱动设计
+- Hollow Knight 动画状态机 — 双轨道混合的实战参考
+- Spine AnimationState API — 骨骼动画集成的标准接口
+
+
+# ──────────────────────────────────────────────────────────
+# FILE: wiki/skills/input.md
+# ──────────────────────────────────────────────────────────
+
+# 输入模块知识
+
+> 覆盖原子：input-capture、action-map、controllable
+
+## 核心原则
+
+- 原始输入和语义动作两层分离：RawInput("KeyW") → Action("jump")。
+- 输入源可替换：KeyboardInputSource、TouchInputSource、NetworkInputSource 都实现同一接口。
+- MultiInputSource 合并多个源 — 本地双人各一个键盘源，联机时换成网络源，引擎代码不变。
+
+## 输入缓冲（Input Buffering）
+
+- 玩家在"不能跳"的帧按了跳跃键，缓冲几帧，"能跳"时自动执行。
+- 实现：RawInput 带 timestamp，action-map 检查最近 N 帧内是否有该输入。
+- 标准缓冲窗口：3-6 帧（60fps 下约 50-100ms）。
+
+## Coyote Time
+
+- 玩家离开平台边缘后几帧内仍允许跳跃 — 补偿视觉与操作的时间差。
+- 实现：Grounded marker 移除后，再保留一个 coyote timer（通常 4-6 帧）。
+- 和输入缓冲配合使用效果最佳。
+
+## 触屏输入
+
+- 虚拟摇杆：touch start 记录原点，touch move 计算偏移方向和力度。
+- 点击区域：屏幕分区（左半移动、右半动作），或叠加透明按钮。
+- 触屏没有"按住"和"松开"的天然反馈 — 需要视觉提示。
+
+## 常见陷阱
+
+- 窗口失焦时没有释放按键 — 切 tab 回来发现角色还在走。监听 blur/visibilitychange 清空输入状态。
+- action-map 不要在 System 里硬编码键位 — 键位映射放 Config 组件或 Assembly 蓝图，支持自定义。
+- 网络模式下输入必须标记 tick 编号 — 确定性回放依赖这个。
+
+## 参考来源
+
+- Celeste coyote time — 宽容时间窗的标准实现
+- Apollo MultiInputSource — 本地双人到联机的无缝切换实现
+- *Juice it or Lose it* (GDC 2012) — 输入手感优化的经典演讲
+
+
+# ──────────────────────────────────────────────────────────
+# FILE: wiki/skills/rendering.md
+# ──────────────────────────────────────────────────────────
+
+# 渲染模块知识
+
+> 覆盖原子：sprite、camera、text、color、visibility
+
+## 核心原则
+
+- 渲染层是 ECS 的单向投影：只读 Transform/Sprite/Color 等组件，绝不写回。
+- 渲染后端可替换：Canvas2D → PixiJS → WebGL，collectRenderables 提取逻辑不变。
+- visibility.visible 控制是否渲染，visibility.active 控制是否参与系统运算。
+
+## Canvas2D（当前后端）
+
+- 够用于 MVP 和原型验证。
+- 每帧 clearRect → 按 zOrder 排序 → 逐个绘制。
+- 性能天花板：~500 个精灵开始卡顿（取决于设备）。
+
+## PixiJS 升级路径
+
+- 替换 CanvasRenderer 为 PixiRenderer，接口不变。
+- Sprite 批处理（batching）：相同纹理的精灵合并为一次 draw call，性能提升 10 倍+。
+- 集成方式：ECS 的 Sprite/Transform 每帧同步到 Pixi DisplayObject。
+
+## 相机系统
+
+- Camera 组件定义观察窗口：zoom、offset、viewport 尺寸。
+- 世界坐标 → 屏幕坐标：screenX = (worldX - camera.offsetX) × zoom。
+- 相机跟随：每帧把 camera.offset 插值到目标实体的 Transform。
+- 屏幕抖动：给 camera.offset 加随机偏移 + 衰减 timer。
+
+## 文字渲染
+
+- Text 组件：content、fontSize、fontFamily、anchor。
+- 伤害数字：spawn 一个带 Text + Velocity(上飘) + Lifetime 的实体。
+- 多语言：content 存 key，渲染时查翻译表。
+
+## 常见陷阱
+
+- zOrder 排序每帧都做 — 如果实体多，用插入排序（近乎有序数组上 O(n)）。
+- 不要在渲染 System 里修改 Transform — 渲染是只读操作。
+- 相机 zoom 会影响碰撞判断的视觉 — 确保碰撞在世界坐标做，不受 zoom 影响。
+
+## 参考来源
+
+- PixiJS — 数千款 HTML5 游戏验证的 2D WebGL 引擎
+- Apollo CanvasRenderer — 当前实现，升级时保持接口不变
+
+
+# ──────────────────────────────────────────────────────────
+# FILE: wiki/skills/lifecycle.md
+# ──────────────────────────────────────────────────────────
+
+# 生命周期模块知识
+
+> 覆盖原子：spawn、destroy、timer、lifetime
+
+## 核心原则
+
+- 实体的创建和销毁都是**请求制**：写入 SpawnRequest / DestroyRequest 组件，由专门 System 统一执行。
+- 不要在 System 逻辑中直接调 world.createEntity / world.removeEntity — 破坏执行顺序确定性。
+- Timer 按 tick 计数，没有 dt — `elapsed++` 每 tick 加一，到 duration 发出 TimerDone。
+
+## 对象池（Entity Pooling）
+
+- 频繁 create/destroy 会产生 GC 压力（子弹、粒子、伤害数字）。
+- 池化方案：destroy 时不删除实体，设 visibility.active = false；spawn 时优先从池里取。
+- 复用时必须重置所有组件到初始值 — 否则会带着上一次的状态。
+
+## Timer 模式
+
+- **倒计时**：elapsed 从 0 涨到 duration，触发 TimerDone，loop=false 则停止。
+- **间隔循环**：loop=true，触发后 elapsed 归零继续。用于持续效果（毒/灼烧/回血）。
+- **一次性延迟**：duration=N, loop=false。N tick 后做一件事。
+
+## Lifetime = Timer + Destroy
+
+- lifetime skill 就是：给实体挂一个 timer，TimerDone 时写入 DestroyRequest。
+- 子弹、粒子、伤害数字都用这个模式。
+
+## Spawn 模板
+
+- SpawnRequest.templateId 指向 Assembly 蓝图中的模板 — spawn System 按模板展开组件。
+- 模板里的 x/y 由 SpawnRequest 覆盖（生成位置 = 请求位置）。
+
+## 常见陷阱
+
+- destroy 在当前 tick 立即生效的话，后续 System 可能读到已删除实体。解决：destroy 统一在 tick 末尾执行。
+- Timer 的 elapsed 不要用浮点数 — 整数 tick 保证确定性。
+- 池化时忘记清理 Relation 组件 — 旧的 targetId 可能指向不存在的实体。
+
+## 参考来源
+
+- Dead Cells 实体池 — Haxe ECS 中池化 + 组件重用的实战案例
+- *Game Programming Patterns* Ch.19 Object Pool — 池化模式的经典讲解
+
+
+# ──────────────────────────────────────────────────────────
+# FILE: wiki/skills/ai-behavior.md
+# ──────────────────────────────────────────────────────────
+
+# AI 行为模块知识
+
+> 覆盖原子：ai-patrol、ai-chase、state、dialogue
+
+## 核心原则
+
+- 游戏 AI 不是机器学习 — 是**手写规则让 NPC 看起来聪明**。
+- 三种主流方案：有限状态机（FSM）、行为树（BT）、目标导向行动规划（GOAP）。
+- Apollo 的 State 组件支撑 FSM；复杂 AI 可扩展为 BT 或 GOAP。
+
+## FSM（有限状态机）
+
+- 最简单、最常用。每个 NPC 同一时刻只在一个状态。
+- 状态转换条件基于游戏数据：距离、血量、flag、timer。
+- 适合：巡逻/追击/攻击/逃跑 等状态少于 10 个的 AI。
+- 缺点：状态多了以后转换条件爆炸式增长（"状态机意大利面"）。
+
+## 行为树（Behavior Tree）
+
+- 树形结构：Selector（选一个能跑的）、Sequence（按顺序全跑）、Leaf（具体行动）。
+- 比 FSM 更好组合和复用 — 子树可以插拔。
+- 适合：中等复杂度 AI（10-30 种行为的 NPC）。
+- Apollo 当前不内置 BT，但可以用 State + 自定义 System 模拟。
+
+## GOAP（目标导向行动规划）
+
+- NPC 声明目标（"杀死玩家"）和可用动作（"移动"、"攻击"、"拾取武器"），规划器自动搜索动作链。
+- 适合：高度动态的 AI（F.E.A.R. 的士兵会翻桌子掩护、包抄夹击）。
+- 开发成本高，小游戏不需要。
+
+## 巡逻（Patrol）
+
+- state(patrol) + timer + velocity(方向切换)。
+- 路径点模式：预设 waypoint 列表，到达一个后切换到下一个。
+- 简单模式：左右来回走，碰墙或 timer 到时反向。
+
+## 追击（Chase）
+
+- spatial-query 找最近的 tag(player) → relation(target) → 朝 target 方向设速度。
+- 追击距离阈值：超出范围回到 patrol。
+- 避免完美追踪 — 加一点延迟或预测误差，让 AI 有"反应时间"。
+
+## 对话（Dialogue）
+
+- trigger-zone + state + input → 显示 Text。
+- 分支对话：State 组件 track 对话进度，Action 组件接收玩家选择。
+- 数据驱动：对话内容放在 JSON/Assembly 蓝图里，不硬编码。
+
+## 常见陷阱
+
+- AI System 执行频率不需要每 tick — 可以每 N tick 决策一次，降低 CPU 开销。
+- 追击时忘记检查视线（line of sight）— NPC 穿墙追人。
+- 状态切换太灵敏 — NPC 在边界条件上反复切状态。加滞后（hysteresis）。
+
+## 参考来源
+
+- F.E.A.R. GOAP (GDC 2006) — GOAP 的经典工业实现
+- *AI for Games* (Millington) — FSM/BT/GOAP 选型的权威教材
+- 模拟人生涌现叙事 (GDC) — 事件驱动的 NPC 行为涌现
+
+
+# ──────────────────────────────────────────────────────────
+# FILE: wiki/skills/resource.md
+# ──────────────────────────────────────────────────────────
+
+# 资源系统模块知识
+
+> 覆盖原子：resource、resource-modify、damage-number、ui-binding
+
+## 核心原则
+
+- Resource 是 { current, min, max } 三元组 — 血量、MP、体力、好感度都是这个结构。
+- 修改资源通过 ResourceModify 事件组件 — 不直接写 current，保证修改可追踪。
+- UI 绑定是单向投影：ECS 数据 → UI 层显示。UI 不写回 ECS。
+
+## Resource 生命周期
+
+1. Assembly 蓝图定义初始值：`{ type: 'Resource', id: 'hp', current: 100, min: 0, max: 100 }`
+2. 触发修改：其他 System 写入 `{ type: 'ResourceModify', resourceId: 'hp', amount: -20 }`
+3. resource System 消费 ResourceModify：`current = clamp(current + amount, min, max)`
+4. 下游检查：current <= min → 触发死亡 / current >= max → 触发满血事件
+
+## 伤害数字（Damage Number）
+
+- ResourceModify 触发后 → spawn 一个文字实体：
+  - Text 组件（显示伤害值）
+  - Velocity（向上飘动）
+  - Lifetime（1-2 秒后销毁）
+  - Color（红色伤害 / 绿色治疗）
+- 位置 = 被击中实体的 Transform + 随机偏移（避免重叠）。
+
+## UI 绑定
+
+- 不要在 ECS System 里操作 DOM / React — ECS 层不知道 UI 存在。
+- React 组件通过 useWorldVersion hook 每 tick 读取 World 状态，自行渲染。
+- 血条 = 读 Resource.current / Resource.max → 渲染为进度条。
+
+## 多资源实体
+
+- 一个实体可以有多个 Resource（hp + mp + stamina）。
+- 区分靠 Resource.id 字段。
+- ResourceModify.resourceId 精确指定修改哪个资源。
+
+## 常见陷阱
+
+- 先检查 current <= 0 再消费 ResourceModify — 否则死亡后还能继续受伤。
+- ResourceModify 必须被消费（移除）— 不消费会每 tick 重复扣血。
+- clamp 时注意顺序：先加 amount 再 clamp，不要先 clamp 再加。
+
+## 参考来源
+
+- 暗黑破坏神系列 — 伤害数字的行业标准视觉反馈
+- *Game Programming Patterns* Ch.5 Observer — 资源变化事件链
+- React/Unity UI Toolkit — 单向数据绑定模式
+
+
+# ──────────────────────────────────────────────────────────
+# FILE: wiki/skills/spatial.md
+# ──────────────────────────────────────────────────────────
+
+# 空间查询模块知识
+
+> 覆盖原子：spatial-query、range-detect、trigger-zone
+
+## 核心原则
+
+- 空间查询回答"某点/范围附近有哪些实体"— 不是碰撞检测，是信息检索。
+- 用空间索引加速：网格分区 O(1) 查邻居，暴力遍历 O(n) 不可接受。
+- trigger-zone 是 overlap + tag 过滤 + 事件触发，不产生物理推开。
+
+## 网格分区（Grid Partition）
+
+- 世界划分为固定大小的格子（cellSize），每个实体按 Transform 位置归入格子。
+- 查询时只检查目标格子及相邻格子 — O(1) 时间复杂度。
+- cellSize 选择：大于最大实体的碰撞半径，小于最小查询范围。通常 64-128 像素。
+- 每帧重建 vs 增量更新：实体少（<1000）全量重建更简单；实体多用增量。
+
+## AABB 树（动态）
+
+- 另一种空间索引：平衡二叉树，叶节点是实体 AABB，内部节点是合并 AABB。
+- 查询用 AABB 重叠测试从根往下剪枝。
+- 适合实体大小差异大的场景（大 boss + 小子弹共存）。
+- Apollo 已有 `src/engine/spatial/aabb-tree.ts` 实现。
+
+## 范围检测（Range Detect）
+
+- spatial-query(圆心, 半径) → 返回范围内所有实体。
+- 加 Tag 过滤：只关心 tag(enemy) 的实体。
+- 用途：自动索敌（auto-target）、技能范围、爆炸伤害。
+
+## 触发区域（Trigger Zone）
+
+- 一个不可见实体，有 Shape 但不产生物理响应。
+- overlap-detect 检测到进入 → 发出事件（开门、对话、剧情触发）。
+- 用 Tag.flags 的 trigger 位标记，碰撞 System 跳过物理响应。
+
+## 常见陷阱
+
+- 网格 cellSize 太小 → 一个实体跨多个格子，查询反而变慢。
+- 空间索引在实体移动后没更新 → 查询结果是上一帧的位置。确保在 motion-apply 之后重建索引。
+- range-detect 不要每 tick 对所有实体查 — 只对有 "range-detect" 需求的实体查。
+
+## 参考来源
+
+- Factorio 空间分区 — 百万实体级网格分区优化
+- *Real-Time Collision Detection* (Ericson) Ch.7 — 空间分区数据结构
+- Apollo aabb-tree.ts — 当前项目的 AABB 树实现
+
+
+# ──────────────────────────────────────────────────────────
+# FILE: wiki/skills/networking.md
+# ──────────────────────────────────────────────────────────
+
+# 网络同步模块知识
+
+> 覆盖原子：random-seed、lockstep、determinism
+
+## 核心原则
+
+- Apollo 的联机模型是**确定性锁步（Deterministic Lockstep）**：所有客户端跑相同逻辑，只同步输入。
+- 确定性 = 相同输入 + 相同初始状态 → 相同结果。每 tick 的哈希必须一致。
+- 一旦确定性被破坏，两端状态会永久分叉 — 没有自愈机制。
+
+## 确定性要求
+
+| 允许 | 禁止 |
+|------|------|
+| Math.sqrt(x*x + y*y) | Math.hypot(x, y) — 跨平台实现不同 |
+| 整数运算 | 浮点运算的中间精度差异 |
+| RandomSeed 组件的 PRNG | Math.random() |
+| 固定 tick 步进 | requestAnimationFrame 的 dt |
+| 确定性的遍历顺序 | Map/Set 的插入顺序依赖 |
+
+## 锁步协议
+
+1. 每个客户端收集本地输入，标记 tick 编号。
+2. 发送输入给所有对端。
+3. 等待收到所有对端当前 tick 的输入。
+4. 所有客户端用相同输入推进同一 tick。
+5. 每 N tick 交换哈希，不一致则报错（desync）。
+
+## 输入延迟 vs 回滚
+
+- **输入延迟**（Apollo 当前）：收到所有人的输入才推进。简单可靠，延迟 = 最慢玩家的网络延迟。
+- **回滚（Rollback）**：先用预测输入推进，收到真实输入后回滚重算。延迟更低但实现复杂。
+- 格斗游戏用回滚（GGPO），RTS 用锁步（星际争霸）。
+
+## RandomSeed
+
+- 全局随机数挂在 world 实体上：seed + sequence。
+- PRNG 算法：每次调用 sequence++，输出 = hash(seed, sequence)。
+- 所有需要随机数的 System 必须用这个 PRNG，不能用 Math.random()。
+
+## BroadcastChannel（本地多 tab 联机）
+
+- Apollo 用 BroadcastChannel API 在浏览器多 tab 间同步输入。
+- 适合开发调试：开两个 tab 就是两个玩家。
+- 生产环境替换为 WebSocket 后端，接口不变。
+
+## 常见陷阱
+
+- 新加的 System 如果遍历实体的顺序不确定 → 破坏确定性。用 entityId 排序。
+- 浮点数的 -0 和 +0 哈希不同 — normalize 为 0。
+- console.log 里的 Math.random() 也会影响全局状态 — 调试时注意。
+
+## 参考来源
+
+- 守望先锋 (GDC 2017) — 确定性 63Hz tick + 网络回滚的工业实现
+- 星际争霸 lockstep — RTS 锁步同步的经典案例
+- Apollo frame-sync.md — 当前项目的帧同步设计文档
+
+
+# ──────────────────────────────────────────────────────────
+# FILE: wiki/skills/otome.md
+# ──────────────────────────────────────────────────────────
+
+# 乙游扩展模块知识
+
+> 覆盖原子：check.resolve、love-interest.event、settlement.resolve
+> 开发阶段：Tier 3/4 方向，Tier 1/2 完成后启动
+
+## 核心原则
+
+- 乙游的核心循环是"选择 → 数值变化 → 情感反馈 → 关系进展"。
+- 所有机制复用 ECS 基础原子 — 好感度是 Resource，情感节拍是 Event，关系是 Relation。
+- defineCapability 需要扩展 domainSlot — 让 skill 描述可以插入领域特定的修正值。
+
+## 检定系统（Check Resolve）
+
+- 玩家做选择 → 计算检定分数 → 判定成功/失败 → 触发后果。
+- 分数 = 基础值 + 属性修正 + 关系值修正 + 随机骰子。
+- 效用 AI 的响应曲线（response curve）决定每个因子的权重。
+- 检定类型：魅力检定、智慧检定、体力检定 — 对应不同属性 Resource。
+
+## 情感事件（Love Interest Event）
+
+- Resource 阈值触发：好感度到达 30/60/90 → 解锁对应情感事件。
+- 事件中玩家选择 → 分支后果（好感+10 / 好感-5 + 解锁隐藏线）。
+- 多路径结构：不是单线剧情，是基于数值的分支网络。
+
+## 周期结算（Settlement Resolve）
+
+- 参考信长之野望/Persona 的时间推进模型。
+- 每周期（一天/一周/一幕）结算：三线资源汇总 → 解锁判定 → 配置下一周期。
+- 三线资源示例：事业线 + 社交线 + 个人成长线。
+- 结算结果影响下一周期可用选项和事件池。
+
+## 领域词汇
+
+| 游戏概念 | ECS 映射 |
+|---------|---------|
+| 好感度 | Resource { id: 'affection_角色名' } |
+| 属性（魅力/智慧/体力） | Resource { id: 'charm' / 'wisdom' / 'stamina' } |
+| 角色关系 | Relation { kind: 'love-interest', targetId } |
+| 情感状态 | State { fsmId: 'emotion', current: 'happy' } |
+| 选择 | Action { name: 'choice_1' } |
+| 回合/周期 | Timer { id: 'period', duration: N } |
+
+## 三文件接口范式
+
+乙游实现分三层文件：
+1. **领域词汇** — 定义游戏概念到 ECS 的映射关系
+2. **能力绑定** — 每个 stage 需要哪些 capability，domainSlot 填什么
+3. **表现钩子** — 情感事件触发什么 UI / 动画 / 音效
+
+## 常见陷阱
+
+- 好感度不能只涨不跌 — 需要负面事件和选错的惩罚，否则没有决策张力。
+- 检定系统的随机成分不能太大 — 玩家需要感觉到"我的选择有影响"。
+- 多角色攻略线要防止数值串台 — Resource.id 必须包含角色标识。
+
+## 参考来源
+
+- 火焰纹章支援系统 — 关系值 + 阈值事件的经典实现
+- Persona 系列 — 周期结算 + 日程管理的标杆
+- 效用 AI (Dave Mark, GDC 2010) — 响应曲线用于情感决策
+- wiki/otome-capability-binding.json — Apollo 的乙游能力绑定规范
+
+
+# ──────────────────────────────────────────────────────────
+# FILE: wiki/skills/serialization.md
+# ──────────────────────────────────────────────────────────
+
+# 序列化与存档模块知识
+
+> 覆盖：存档/读档、状态快照、JSON 序列化、schema 版本迁移
+
+## 核心原则
+
+- 游戏存档 = World 的完整快照：所有实体 + 所有组件的当前值。
+- 序列化只存数据（Component），不存逻辑（System）— System 由 Assembly 蓝图恢复。
+- 存档格式必须有版本号 — 游戏更新后旧存档要能迁移。
+
+## 序列化策略
+
+### JSON 序列化（当前推荐）
+- 优点：可读、可调试、前端原生支持。
+- 缺点：体积大、解析慢。
+- Apollo 组件都是 plain object，`JSON.stringify` 直接可用。
+- 注意：EntityId 如果是 number 需确保 JSON 不丢精度。
+
+### 结构化克隆（structuredClone）
+- 浏览器原生深拷贝，支持 Map/Set/ArrayBuffer。
+- 适合内存快照（undo/redo、确定性回放的 checkpoint）。
+- 不能持久化到文件 — 只用于运行时。
+
+### 二进制序列化（进阶）
+- MessagePack / Protocol Buffers / FlatBuffers。
+- 体积小 3-5 倍，解析快 10 倍+。
+- 适合：存档大（RPG/策略）、网络传输（减少带宽）。
+- FlatBuffers 零拷贝读取 — 适合超大存档。
+
+## 存档结构
+
+```
+{
+  version: 2,                    // schema 版本
+  timestamp: 1717400000,
+  world: {
+    tick: 12345,
+    seed: { seed: 42, sequence: 789 },
+    entities: [
+      { id: 1, components: [ { type: 'Transform', x: 100, y: 200, ... }, ... ] },
+      ...
+    ]
+  }
+}
+```
+
+## Schema 版本迁移
+
+- 每个版本写一个迁移函数：`migrate_v1_to_v2(save)`。
+- 链式迁移：v1 → v2 → v3，每步只处理一个版本差。
+- 新增组件：迁移时补默认值。删除组件：迁移时忽略。字段改名：迁移时映射。
+- 永远不要删除迁移函数 — 玩家可能拿着 v1 的存档回来。
+
+## 存档槽位
+
+- 多存档：save_1.json, save_2.json, auto_save.json。
+- 自动存档：每 N 个周期/场景切换时自动保存。
+- 存档预览：存档文件里带一份摘要（角色名、进度、时间戳）用于 UI 列表展示。
+
+## Web 环境持久化
+
+| 方案 | 容量 | 特点 |
+|------|------|------|
+| localStorage | 5-10 MB | 同步、最简单、阻塞主线程 |
+| IndexedDB | 数百 MB+ | 异步、支持二进制、需要封装 |
+| File System Access API | 无限制 | 用户选择文件、桌面端体验 |
+| Cloud Save | 取决于后端 | 跨设备同步、需要登录 |
+
+- 微信小游戏：用 `wx.setStorage` / `wx.getStorage`，上限 10MB。
+- 建议：小存档用 localStorage，大存档用 IndexedDB。
+
+## 确定性回放存档
+
+- 不存 World 快照，只存初始状态 + 每 tick 的输入序列。
+- 回放时重跑所有 tick — 存档极小，但加载慢（要重跑）。
+- 适合：格斗/竞技游戏的录像系统。
+- Apollo 的 debug/recorder.ts 已有此模式的基础实现。
+
+## 常见陷阱
+
+- 循环引用：Entity A 的 Relation 指向 B，B 指向 A。JSON.stringify 会崩。用 EntityId 引用，不要存对象引用。
+- 存档时机：不要在 tick 中间存 — 只在 tick 结束时存，保证状态一致。
+- localStorage 是同步的：大存档会冻结 UI。超过 1MB 就该用 IndexedDB。
+- 敏感数据：不要把服务端校验的数值（充值货币）存在客户端 — 会被篡改。
+
+## 前沿技术
+
+- **Automerge / Yjs**：CRDT 库，支持多端协同编辑同一份存档（联机存档同步）。
+- **SQLite on WASM (sql.js)**：在浏览器里跑 SQLite，适合复杂查询的存档（RPG 的背包/任务系统）。
+- **Incremental snapshot**：只存变化的组件，不存完整世界。适合实时自动存档。
+
+## 参考来源
+
+- Apollo debug/recorder.ts — 确定性回放录制的现有实现
+- FlatBuffers — Google 的零拷贝序列化，适合大存档
+- IndexedDB API — 浏览器端大容量异步存储
+
+
+# ──────────────────────────────────────────────────────────
+# FILE: wiki/skills/typescript-patterns.md
+# ──────────────────────────────────────────────────────────
+
+# TypeScript 模式知识
+
+> 覆盖：游戏开发中的 TS 类型模式、性能注意、工具链
+
+## 核心原则
+
+- TypeScript 的类型系统是编译时的 — 运行时零开销，放心用复杂类型。
+- 游戏热路径（tick 循环）里避免产生垃圾对象 — TS 不改变 JS 的 GC 行为。
+- 类型是文档：好的类型定义比注释更准确，且编译器强制执行。
+
+## 判别联合（Discriminated Union）
+
+Apollo 组件的核心模式：用 `type` 字段区分组件种类。
+
+```typescript
+// 每个 Component 用 readonly type 做判别符
+interface Transform extends Component { readonly type: 'Transform'; x: number; y: number; }
+interface Velocity extends Component { readonly type: 'Velocity'; vx: number; vy: number; }
+type AnyComponent = Transform | Velocity | ...;
+
+// 类型守卫自动收窄
+function handle(c: AnyComponent) {
+  if (c.type === 'Transform') { /* c 自动是 Transform */ }
+}
+```
+
+## Branded Type（品牌类型）
+
+给原始类型加标签，防止混用：
+
+```typescript
+type EntityId = number & { readonly __brand: 'EntityId' };
+type Tick = number & { readonly __brand: 'Tick' };
+// EntityId 和 Tick 都是 number，但不能互相赋值
+```
+
+- Apollo 的 EntityId 用此模式，防止把 tick 编号误当实体 ID。
+
+## 泛型组件查询
+
+```typescript
+function getComponent<T extends Component>(entity: Entity, type: T['type']): T | undefined;
+// 调用时自动推断返回类型
+const t = getComponent<Transform>(e, 'Transform'); // t: Transform | undefined
+```
+
+## const 断言与字面量类型
+
+```typescript
+const KEYMAP = { ArrowUp: 'jump', ArrowLeft: 'left' } as const;
+// typeof KEYMAP = { readonly ArrowUp: 'jump'; readonly ArrowLeft: 'left' }
+// 值的类型是字面量 'jump' | 'left'，不是宽泛的 string
+```
+
+- Assembly 蓝图中的配置用 `as const` 锁定，防止手滑改错值。
+
+## 类型守卫（Type Guard）
+
+```typescript
+function isTransform(c: Component): c is Transform {
+  return c.type === 'Transform';
+}
+// 过滤数组时自动收窄类型
+const transforms = components.filter(isTransform); // Transform[]
+```
+
+## Readonly 与 Immutability
+
+- 组件的 `type` 字段用 `readonly` — 防止运行时修改判别符。
+- 配置型组件整体用 `Readonly<T>` — 编译时阻止意外修改。
+- 注意：Readonly 是浅层的。深层不可变用 `DeepReadonly` 或运行时 `Object.freeze`。
+
+## 性能相关 TS 模式
+
+### 避免热路径中创建对象
+```typescript
+// ❌ 每 tick 创建新对象
+function getVelocity(): { vx: number; vy: number } { return { vx: 1, vy: 2 }; }
+
+// ✅ 复用预分配对象
+const _tempVec = { vx: 0, vy: 0 };
+function getVelocity(): { vx: number; vy: number } { _tempVec.vx = 1; _tempVec.vy = 2; return _tempVec; }
+```
+
+### 数组预分配
+```typescript
+// ❌ 动态 push
+const results: Entity[] = [];
+for (...) results.push(e);
+
+// ✅ 已知上限时预分配
+const results = new Array<Entity>(maxCount);
+let count = 0;
+for (...) results[count++] = e;
+```
+
+### Map vs Object
+- 键是动态字符串/数字 → 用 `Map`（哈希性能好、有 size、迭代顺序确定）。
+- 键是固定字符串集合 → 用 plain object（V8 隐藏类优化）。
+- Apollo 的 World 用 `Map<EntityId, Map<string, Component>>` — 正确选择。
+
+## 工具链
+
+| 工具 | 用途 | Apollo 配置 |
+|------|------|------------|
+| **tsc** | 类型检查 | `tsc --noEmit`，只做检查不输出 |
+| **Vite** | 开发/构建 | esbuild 转译 TS（不做类型检查，快） |
+| **vitest** | 测试 | 原生 TS 支持，不需要额外配置 |
+| **tsconfig paths** | 路径别名 | `@renderer/*`, `@net/*` 等别名 |
+
+## 严格模式检查清单
+
+确保 tsconfig.json 开启：
+- `strict: true` — 包含以下所有
+- `noUncheckedIndexedAccess` — 数组/Map 取值可能 undefined
+- `exactOptionalProperties` — 可选属性不能显式赋 undefined
+- `noUnusedLocals` / `noUnusedParameters` — 清除死代码
+
+## 常见陷阱
+
+- `as` 类型断言不是类型转换 — 它骗编译器，运行时不做任何事。滥用 `as` 等于关类型安全。
+- enum 编译出的 JS 很丑且有运行时开销 — 用 `as const` 对象 + 字面量联合代替。
+- 接口（interface）可以被扩展/合并，类型别名（type）不行 — 组件定义用 interface。
+- `!` 非空断言隐藏 bug — 尽量用条件检查或 optional chaining。
+
+## 前沿技术
+
+- **TypeScript 5.x 装饰器**：stage 3 标准装饰器，可用于 System 注册（`@system('motion-apply')`）。
+- **using 声明 (Explicit Resource Management)**：TS 5.2+，自动释放资源，适合渲染上下文/音频上下文管理。
+- **satisfies 运算符**：检查类型但保留窄类型推断，适合 Assembly 蓝图配置验证。
+
+## 参考来源
+
+- Apollo src/engine/core/types.ts — EntityId branded type、Component 判别联合
+- Apollo src/engine/protocol/components.ts — 26 个组件接口的 TS 模式
+- TypeScript Handbook — 官方判别联合与类型守卫文档
+
+
+# ──────────────────────────────────────────────────────────
+# FILE: wiki/skills/ui-system.md
+# ──────────────────────────────────────────────────────────
+
+# UI 系统模块知识
+
+> 覆盖：游戏 UI 架构、HUD、菜单、对话框、React 与 ECS 集成
+
+## 核心原则
+
+- 游戏 UI 和 ECS 是两个世界：ECS 管逻辑，UI 只做展示 + 收集输入。
+- 数据流向：ECS → UI 单向投影（显示血量），UI → ECS 通过 Action 组件（玩家点了按钮）。
+- 游戏 UI 不等于 Web UI — 游戏 UI 要 60fps 响应、视觉反馈即时、不能有布局抖动。
+
+## 架构：React Overlay 模式
+
+Apollo 当前方案：Canvas 画游戏，React DOM 叠加在上方做 UI。
+
+```
+┌──────────────────────────┐
+│  React DOM (z-index: 10) │  ← 血条、菜单、对话框
+│  pointerEvents: none     │
+├──────────────────────────┤
+│  Canvas (z-index: 0)     │  ← 游戏世界渲染
+└──────────────────────────┘
+```
+
+- 优点：React 的组件化/状态管理做 UI 很成熟。
+- 缺点：DOM 更新和 Canvas 渲染不完全同步，可能有 1 帧延迟。
+- UI 层默认 `pointerEvents: none`，需要交互的元素单独开 `pointerEvents: auto`。
+
+## 数据桥接：useWorldVersion
+
+```typescript
+function useWorldVersion(engine: Engine): number {
+  // 每 tick 递增的 version，触发 React 重渲染
+  // UI 组件读 engine.world 的最新状态
+}
+```
+
+- 不要用 useEffect + setInterval 轮询 — 用引擎 tick 驱动。
+- 不要在 hook 里写 world — 只读。
+
+## HUD（头显信息）
+
+| 元素 | 数据来源 | 更新频率 |
+|------|---------|---------|
+| 血条 | Resource { id: 'hp' } | 受伤时 |
+| 分数 | Resource { id: 'score' } | 得分时 |
+| 小地图 | 所有实体 Transform | 每帧 |
+| 技能冷却 | Timer { id: 'skill_cd' } | 每帧 |
+| 帧率/调试 | engine.stats | 每帧 |
+
+- 血条动画：当前值 lerp 到目标值，视觉上有"掉血"过渡。
+- 低血量警告：current/max < 0.2 时血条变红 + 屏幕边缘泛红。
+
+## 菜单系统
+
+- 游戏状态机控制菜单显隐：State { fsmId: 'game', current: 'menu' | 'playing' | 'paused' }。
+- 暂停菜单：engine.pause() 停止 tick，UI 层显示暂停界面。
+- 菜单导航：键盘用方向键 + 确认键，触屏用点击。不要只支持鼠标。
+
+## 对话框
+
+- 打字机效果：每帧显示一个字符，用 Timer 控制速度。
+- 选项分支：显示 2-4 个选项按钮，点击后写入 Action 组件。
+- 跳过动画：点击/确认键立即显示全部文字。
+- 立绘联动：对话时切换角色立绘表情（State 组件驱动）。
+
+## 背包/物品栏
+
+- 网格布局：固定 slot 数量，每个 slot 绑定一个实体的组件数据。
+- 拖拽：HTML5 Drag and Drop 或自定义 pointer 事件。
+- 排序/筛选：前端 UI 层做，不影响 ECS 数据顺序。
+
+## 伤害数字（UI 层实现）
+
+两种方案：
+1. **ECS 实体方案**：spawn 带 Text + Velocity + Lifetime 的实体，渲染层画。
+2. **纯 UI 方案**：React 组件接收 damage 事件，用 CSS animation 做飘字。
+
+- 方案 1 确定性好（录像可重放），方案 2 视觉效果更丰富（CSS 缓动）。
+
+## 响应式布局
+
+- 游戏画布固定逻辑分辨率（640×400），CSS transform 缩放适配屏幕。
+- UI 元素用百分比/viewport 单位定位，不用固定像素。
+- 微信小游戏：用 `wx.getSystemInfoSync()` 获取安全区域，避开刘海/圆角。
+
+## 常见陷阱
+
+- React 重渲染过频：每 tick 更新所有 UI 组件很贵。用 `React.memo` + 浅比较，只更新变化的部分。
+- 字体加载：自定义字体未加载完就渲染 → 文字闪烁。用 `document.fonts.ready` 等待。
+- 触屏穿透：UI 按钮点击后事件穿透到 Canvas → 角色也动了。`stopPropagation`。
+- 不要用 innerHTML 渲染玩家输入的文本 — XSS 风险。用 textContent 或 React 的自动转义。
+
+## 前沿技术
+
+- **CSS Houdini (Paint Worklet)**：用 JS 画自定义 CSS 背景，适合程序化 UI 装饰（能量条纹理、动态边框）。
+- **View Transitions API**：场景切换时的原生过渡动画，替代手写 fade/slide。
+- **Popover API**：原生弹出层管理，适合工具提示、物品详情浮窗。
+- **anchor() CSS**：元素锚定定位，适合跟随游戏实体的 UI（血条浮在角色头上）。
+
+## 参考来源
+
+- Apollo src/ui/GameOverlay.tsx — 当前 React Overlay 实现
+- Apollo src/ui/hooks/use-engine.ts — useWorldVersion 桥接 hook
+- React 官方文档 — 组件化 UI 的最佳实践
+
+
+# ──────────────────────────────────────────────────────────
+# FILE: wiki/skills/audio.md
+# ──────────────────────────────────────────────────────────
+
+# 音频模块知识
+
+> 覆盖：Web Audio API、音效管理、BGM、Sound 组件集成
+
+## 核心原则
+
+- 浏览器要求用户交互后才能播放音频（autoplay policy）— 第一次点击/触屏时初始化 AudioContext。
+- 音效（SFX）和背景音乐（BGM）分开管理：SFX 短促可叠加，BGM 长循环单轨道。
+- Sound 组件是 ECS 的渲染层输出 — 和 Sprite 一样，System 写 Sound，音频后端消费并播放。
+
+## Web Audio API 基础
+
+```
+AudioContext
+  ├── GainNode (master volume)
+  │     ├── GainNode (sfx bus)
+  │     │     ├── AudioBufferSourceNode (跳跃音效)
+  │     │     └── AudioBufferSourceNode (爆炸音效)
+  │     └── GainNode (bgm bus)
+  │           └── AudioBufferSourceNode (背景音乐)
+  └── AnalyserNode (可视化，可选)
+```
+
+- AudioBufferSourceNode 是一次性的 — 播完就废弃，下次播新建一个。
+- GainNode 做分轨音量控制：总音量、SFX 音量、BGM 音量独立调。
+
+## 音效池化（SFX Pool）
+
+- 预加载：启动时 fetch + decodeAudioData 把所有音效解码到 AudioBuffer。
+- 播放：从 AudioBuffer 创建 source → connect → start。
+- 并发控制：同一音效最多同时播 N 个（避免 100 颗子弹同时播碰撞音）。
+- 优先级：重要音效（死亡、过关）抢占低优先级音效的通道。
+
+## BGM 管理
+
+- 同一时间只播一首 BGM。
+- 切换时淡入淡出（crossfade）：旧曲 gain 0.5s 降到 0，新曲 gain 0.5s 升到 1。
+- loop 无缝衔接：设置 `source.loop = true`，精确指定 `loopStart`/`loopEnd` 避免间隙。
+- 暂停恢复：`AudioContext.suspend()` / `AudioContext.resume()`。
+
+## 音频格式
+
+| 格式 | 大小 | 质量 | 浏览器支持 |
+|------|------|------|-----------|
+| **OGG Vorbis** | 小 | 好 | Chrome/Firefox/Edge，Safari 17+ |
+| **AAC/M4A** | 小 | 好 | 全平台 |
+| **MP3** | 中 | 中 | 全平台（专利已过期） |
+| **WAV** | 大 | 无损 | 全平台（仅用于开发） |
+| **Opus** | 最小 | 最好 | 现代浏览器全支持 |
+
+- 推荐：BGM 用 OGG/Opus，SFX 用 OGG/AAC。准备两种格式做 fallback。
+
+## 与 ECS 集成
+
+- Sound 组件：`{ clipId: 'jump', volume: 0.8, loop: false }`。
+- 音频 System 每帧扫描新的 Sound 组件 → 播放 → 标记已播放或移除。
+- 循环音效（脚步声）：loop=true 时只在首次触发播放，Sound 组件存在期间持续。
+- 停止：移除 Sound 组件 → 音频 System 停止对应 source。
+
+## 空间音频（2D 声像）
+
+- 用 StereoPannerNode 根据实体 x 坐标做左右声像。
+- pan = (entity.x - camera.centerX) / (viewportW / 2)，clamp 到 [-1, 1]。
+- 距离衰减：音量 × (1 - distance / maxDistance)，超出范围静音。
+
+## 常见陷阱
+
+- 第一次 AudioContext 创建后可能是 suspended 状态 — 用户交互时调用 `context.resume()`。
+- 移动端切后台：AudioContext 会被系统暂停。监听 visibilitychange 恢复。
+- 音效文件太大：SFX 不超过 500KB，BGM 不超过 5MB（OGG）。大了要压缩。
+- 不要用 `<audio>` 标签做 SFX — 延迟高、不能精确控制。仅 BGM 可考虑。
+
+## 前沿技术
+
+- **AudioWorklet**：在独立线程做音频处理，不阻塞主线程。适合实时音效合成。
+- **Web Codecs API**：底层音视频编解码，适合自定义音频格式或流式音频。
+- **Tone.js**：Web Audio 的高级封装，内置合成器/效果器，适合音乐类游戏。
+
+## 参考来源
+
+- Web Audio API (MDN) — 完整的节点类型和用法文档
+- Apollo src/engine/protocol/components.ts Sound 组件 — 当前数据结构
+- Howler.js — 流行的 Web 音频库，可作为 Apollo 音频后端的参考
+
+
+# ──────────────────────────────────────────────────────────
+# FILE: wiki/skills/scene-management.md
+# ──────────────────────────────────────────────────────────
+
+# 场景管理模块知识
+
+> 覆盖：场景切换、关卡加载、游戏状态机、过渡动画
+
+## 核心原则
+
+- 游戏在宏观上是一个状态机：Loading → Menu → Playing → Paused → GameOver → Menu。
+- 场景切换 = 清空当前 World + 加载新的 Assembly 蓝图。
+- 过渡期间引擎必须有明确状态 — 不能在"半清空半加载"的状态下 tick。
+
+## 游戏状态机
+
+```
+┌──────┐  start   ┌─────────┐  play   ┌─────────┐
+│ Boot │────────→│  Menu   │───────→│ Playing │
+└──────┘         └─────────┘        └────┬────┘
+                      ↑                   │ pause
+                      │ resume     ┌──────▼──────┐
+                      └────────────│   Paused    │
+                                   └─────────────┘
+                 ┌─────────┐  retry  ┌───────────┐
+                 │  Menu   │←────────│ Game Over │
+                 └─────────┘         └───────────┘
+```
+
+- 每个状态对应一组行为：Playing 时 tick 运行，Paused 时 tick 暂停但 UI 响应。
+- 状态切换通过 Engine 层 API：`engine.loadScene(blueprint)`, `engine.pause()`, `engine.resume()`。
+
+## 场景加载流程
+
+1. **触发**：玩家点"开始游戏" / 到达关卡出口 / 死亡后重试。
+2. **过渡开始**：播放遮罩动画（黑幕淡入），禁止输入。
+3. **卸载**：清空当前 World 所有实体和组件。
+4. **加载**：执行新场景的 Assembly 蓝图，创建所有实体。
+5. **初始化**：预热 System（空间索引重建、音频预加载）。
+6. **过渡结束**：遮罩淡出，恢复输入，开始 tick。
+
+## 关卡设计数据
+
+- 关卡 = Assembly 蓝图 + 关卡特定配置（重力值、边界、敌人布局）。
+- 数据驱动：关卡信息存在 JSON 里，不硬编码。
+
+```typescript
+interface LevelConfig {
+  id: string;
+  blueprint: AssemblyBlueprint;
+  gravity: number;
+  bounds: { minX: number; minY: number; maxX: number; maxY: number };
+  nextLevel: string | null;
+}
+```
+
+- 关卡选择画面读取所有 LevelConfig 的元信息（名称、缩略图、是否解锁）。
+
+## 过渡动画
+
+| 类型 | 实现 | 适合场景 |
+|------|------|---------|
+| 黑幕淡入淡出 | CSS opacity 过渡 | 通用 |
+| 圆形收缩（iris wipe） | Canvas clip path 动画 | 复古风 |
+| 像素化溶解 | shader 或 Canvas 像素操作 | 像素游戏 |
+| 滑入滑出 | CSS transform 或 Canvas 偏移 | 横版关卡 |
+
+- 过渡动画在 UI 层做（React/CSS），不在 ECS 里 — 过渡时 ECS 已暂停。
+
+## 场景栈（Scene Stack）
+
+- 暂停菜单叠在游戏场景上面 — 游戏场景不卸载，只暂停。
+- 场景栈：`[Playing, PauseMenu]`，顶层接收输入，底层只渲染不 tick。
+- 弹栈：关闭暂停菜单 → 恢复 Playing 的 tick。
+- 适合：暂停、背包、商店等不需要卸载主场景的叠加界面。
+
+## 持久实体
+
+- 场景切换时某些实体不销毁：玩家角色、全局音乐、分数。
+- 标记方式：给持久实体加 Tag.flags 的 persistent 位。
+- 场景卸载时跳过 persistent 实体。
+
+## 常见陷阱
+
+- 场景切换时忘记清理事件监听（keyboard listener、timer）→ 内存泄漏。
+- 异步加载资源时玩家快速切场景 → 旧场景的资源回调写入新场景。用 abort controller。
+- 关卡数据直接存在代码里 → 不可热更新。存 JSON，运行时 fetch。
+- 过渡动画期间允许输入 → 玩家在加载中触发了操作。过渡期间禁止输入。
+
+## 前沿技术
+
+- **View Transitions API**：浏览器原生页面过渡，可用于菜单 ↔ 游戏的切换动画。
+- **OffscreenCanvas**：在 Worker 线程预渲染下一关的首帧，加载完成时无缝切换。
+- **Streaming Assembly**：大关卡分块加载，先加载可见区域，玩家移动时加载新区域。
+
+## 参考来源
+
+- Unity SceneManager — 场景加载/卸载的行业标准 API 设计
+- Godot SceneTree — 场景栈 + 节点持久化的参考实现
+- Apollo runtime/engine.ts — 当前 start/stop/load 接口
+
+
+# ──────────────────────────────────────────────────────────
+# FILE: wiki/skills/tilemap.md
+# ──────────────────────────────────────────────────────────
+
+# 瓦片地图模块知识
+
+> 覆盖：Tilemap 渲染、图块集、Tiled 编辑器、瓦片碰撞
+
+## 核心原则
+
+- 瓦片地图是 2D 游戏最高效的关卡构建方式 — 一个二维数组 + 一张图块集 = 整个关卡。
+- 瓦片是静态的：不是 ECS 实体，不参与 tick 循环。只在碰撞检测时被查询。
+- 分层：地面层（碰撞）、装饰层（只渲染）、前景层（遮挡玩家）。
+
+## 数据结构
+
+```typescript
+interface Tilemap {
+  width: number;          // 横向格数
+  height: number;         // 纵向格数
+  tileSize: number;       // 每格像素（16/32/64）
+  layers: TileLayer[];
+}
+
+interface TileLayer {
+  name: string;           // 'ground' | 'decoration' | 'foreground'
+  data: number[];         // 一维数组，row-major，0 = 空格
+  collides: boolean;      // 是否参与碰撞检测
+}
+```
+
+- 坐标转换：`tileX = Math.floor(worldX / tileSize)`, `tileY = Math.floor(worldY / tileSize)`。
+- 索引转换：`index = tileY * width + tileX`。
+
+## Tiled 编辑器
+
+- 行业标准的 2D 地图编辑器（免费开源）。
+- 导出 JSON 格式，可直接解析为上述数据结构。
+- 支持：正交/等距/六角地图、动画瓦片、对象层（放置敌人、触发器）。
+- 对象层 → ECS 实体：Tiled 里放的每个对象 → 场景加载时 spawn 对应实体。
+
+## 图块集（Tileset）
+
+- 一张大图包含所有瓦片，按网格切割。
+- 每个瓦片有 ID（从 1 开始，0 = 空）。
+- 渲染时：瓦片 ID → 计算在图块集中的 UV 坐标 → 绘制到对应位置。
+
+```typescript
+// 从瓦片 ID 计算图块集中的源矩形
+const col = (tileId - 1) % tilesPerRow;
+const row = Math.floor((tileId - 1) / tilesPerRow);
+const srcX = col * tileSize;
+const srcY = row * tileSize;
+```
+
+## 瓦片碰撞
+
+- 不需要对每个瓦片做 AABB 检测 — 只检查实体周围的瓦片。
+- 查询算法：实体 AABB → 覆盖哪些瓦片坐标 → 查这些瓦片是否 collides。
+
+```typescript
+const startCol = Math.floor(entityLeft / tileSize);
+const endCol = Math.floor(entityRight / tileSize);
+const startRow = Math.floor(entityTop / tileSize);
+const endRow = Math.floor(entityBottom / tileSize);
+for (let r = startRow; r <= endRow; r++)
+  for (let c = startCol; c <= endCol; c++)
+    if (getTile(layer, c, r) !== 0) { /* 碰撞 */ }
+```
+
+- 穿透分离和实体碰撞相同：normal × depth 推开。
+- 瓦片等效于 mass=0 的静态物体。
+
+## 渲染优化
+
+- **只画可见区域**：根据相机位置计算可见瓦片范围，只绘制这些。
+- **离屏缓存**：把整层瓦片预渲染到一张大 Canvas，滚动时只做 drawImage 偏移。
+- **图块集合批**：所有瓦片共用同一张纹理 → WebGL 下一次 draw call 画整层。
+- 动画瓦片（水面、岩浆）：用全局 Timer 切换帧，所有同类瓦片同步动画。
+
+## 自动图块（Auto-tiling）
+
+- 根据相邻瓦片自动选择正确的边角图案。
+- Wang tiles / Blob tileset：4 位/8 位邻接掩码 → 对应图块 ID。
+- Tiled 内置地形画笔支持自动图块。
+
+## 大地图处理
+
+- 超大地图（1000×1000+）不能一次性加载 — 分块（chunk）加载。
+- 每个 chunk 是 16×16 或 32×32 瓦片，按需加载和卸载。
+- 无限地图：程序化生成 chunk，噪声函数决定地形。
+
+## 常见陷阱
+
+- Tiled 导出的坐标系 y 轴向下 — 和某些引擎的 y 轴向上不同，注意翻转。
+- 瓦片 ID 从 1 开始（Tiled 约定）— 代码里容易写成从 0 开始。
+- 碰撞检测时实体移动太快跳过瓦片 — 和实体碰撞一样需要子步进。
+- 装饰层不要参与碰撞 — 否则背景花草会挡住角色。
+
+## 前沿技术
+
+- **LDtk（Level Designer Toolkit）**：比 Tiled 更现代的关卡编辑器，JSON 导出，内置自动图块和实体定义。
+- **Wave Function Collapse**：基于约束传播的程序化瓦片生成，比纯噪声更有结构感。
+- **GPU Tilemap 渲染**：用 instanced rendering 或纹理数组，一次 draw call 画整张地图。
+
+## 参考来源
+
+- Tiled Map Editor — 2D 地图编辑的行业标准工具
+- Celeste 关卡设计 — 像素完美瓦片碰撞的参考实现
+- LDtk — 现代关卡编辑器（Dead Cells 作者开发）
+
+
+# ──────────────────────────────────────────────────────────
+# FILE: wiki/skills/math-utils.md
+# ──────────────────────────────────────────────────────────
+
+# 数学工具模块知识
+
+> 覆盖：向量运算、插值、缓动函数、角度、随机
+
+## 核心原则
+
+- 游戏数学 90% 是向量加减和插值 — 不需要线性代数库，手写几个函数就够。
+- 所有数学运算必须确定性：不用 Math.hypot、不用 Math.random、注意浮点精度。
+- 能用整数的场景不用浮点：像素坐标、瓦片坐标、tick 计数。
+
+## 向量运算
+
+```typescript
+// 基础运算（不创建新对象，直接操作分量）
+length(x, y) = Math.sqrt(x * x + y * y)   // 不用 Math.hypot
+normalize(x, y) → { x/len, y/len }         // len=0 时返回 {0,0}
+dot(ax, ay, bx, by) = ax*bx + ay*by
+cross2d(ax, ay, bx, by) = ax*by - ay*bx    // 2D 叉积是标量
+distance(x1, y1, x2, y2) = length(x2-x1, y2-y1)
+```
+
+- 不要创建 Vector2 类实例做临时运算 — GC 压力。用分量直接算。
+- 需要距离比较时用 `distanceSquared` 避免 sqrt。
+
+## 线性插值（Lerp）
+
+```typescript
+lerp(a, b, t) = a + (b - a) * t    // t ∈ [0, 1]
+```
+
+- 用途：平滑移动（相机跟随）、颜色渐变、音量过渡。
+- t 不 clamp 会超调 — 除非故意要弹性效果。
+- 帧率无关 lerp：`value = lerp(value, target, 1 - Math.pow(smoothing, dt))`。Apollo 用固定 tick 所以直接用常量 t 即可。
+
+## 缓动函数（Easing）
+
+| 函数 | 公式 | 视觉效果 |
+|------|------|---------|
+| easeInQuad | t² | 慢启动 |
+| easeOutQuad | 1-(1-t)² | 慢停止 |
+| easeInOutQuad | 分段 | 慢启慢停 |
+| easeOutBounce | 分段弹跳 | 落地弹跳 |
+| easeOutElastic | 弹簧衰减 | 弹性 UI |
+| easeOutBack | 超调回弹 | UI 弹出 |
+
+- t 是归一化时间（elapsed / duration），输出是归一化进度。
+- 用途：UI 动画、伤害数字飘动、角色受击闪烁。
+- 不要在物理运算里用 easing — 物理用真实的力和加速度。
+
+## 角度与方向
+
+```typescript
+// 弧度制（TS Math 全用弧度）
+atan2(dy, dx) → 弧度角（-π 到 π）
+// 角度归一化到 [-π, π]
+normalizeAngle(a) = a - Math.round(a / (2*PI)) * (2*PI)
+// 最短旋转方向
+shortestAngle(from, to) = normalizeAngle(to - from)
+```
+
+- 2D 游戏里"朝向"通常只用 ±1（左右翻转），不用真正的角度。
+- 需要射击方向时才用 atan2。
+
+## 矩形运算
+
+```typescript
+// AABB 包含检测
+contains(rect, px, py) = px >= rect.x && px <= rect.x + rect.w && ...
+// AABB 相交
+intersects(a, b) = a.x < b.x+b.w && a.x+a.w > b.x && a.y < b.y+b.h && a.y+a.h > b.y
+// 扩展 AABB（加边距）
+inflate(rect, margin) = { x: rect.x-margin, y: rect.y-margin, w: rect.w+2*margin, h: rect.h+2*margin }
+```
+
+## Clamp 与 Remap
+
+```typescript
+clamp(value, min, max) = Math.max(min, Math.min(max, value))
+remap(value, inMin, inMax, outMin, outMax) = outMin + (value-inMin)/(inMax-inMin) * (outMax-outMin)
+```
+
+- clamp 是最常用的数学工具 — 血量、坐标、音量都要 clamp。
+- remap 把一个范围映射到另一个：距离 [0,500] → 音量 [1,0]。
+
+## 确定性随机
+
+- Apollo 用 RandomSeed 组件的 PRNG，不用 Math.random()。
+- 常用算法：xorshift32、mulberry32 — 简单快速，周期足够。
+- 随机范围：`min + (prng() % (max - min + 1))`（整数），`min + prng01() * (max - min)`（浮点）。
+- 洗牌：Fisher-Yates，用 PRNG 而非 Math.random。
+
+## 常见陷阱
+
+- `Math.sqrt(-epsilon)` 返回 NaN — 在 length 计算前检查是否为负（浮点精度问题）。
+- 角度差超过 π 时旋转方向反了 — 用 shortestAngle。
+- lerp 的 t > 1 时超调 — UI 动画可以接受，物理运算不行。
+- 整数除法用 `Math.floor(a/b)` 而非 `a/b|0` — 后者对负数行为不同。
+
+## 前沿技术
+
+- **WASM SIMD**：浏览器支持 SIMD 指令，批量向量运算加速 4 倍。适合粒子系统、大量实体运动。
+- **Fixed-point arithmetic**：用整数模拟小数（×1000），完全确定性。适合联机核心逻辑。
+- **Spatial hashing with bit tricks**：用位运算加速空间哈希的键计算。
+
+## 参考来源
+
+- *Game Programming Patterns* — lerp 和缓动在游戏中的应用
+- easings.net — 所有标准缓动函数的可视化和公式
+- Apollo src/atom-skills/random/index.ts — 当前 PRNG 实现
+
+
+# ──────────────────────────────────────────────────────────
+# FILE: wiki/skills/performance.md
+# ──────────────────────────────────────────────────────────
+
+# 性能优化模块知识
+
+> 覆盖：帧预算、GC 回避、批处理、内存布局、性能剖析
+
+## 核心原则
+
+- 60fps = 每帧 16.67ms 预算。超过就掉帧，玩家能感知。
+- 游戏性能瓶颈 90% 来自三个地方：GC 暂停、draw call 过多、O(n²) 算法。
+- 先量测再优化 — 不要猜。用 Performance API 和 Chrome DevTools 定位瓶颈。
+
+## 帧预算分配
+
+| 阶段 | 目标预算 | 说明 |
+|------|---------|------|
+| Input 采集 | < 0.5ms | 读键盘/触屏状态 |
+| ECS tick | < 8ms | 所有 System 执行 |
+| 碰撞检测 | < 3ms | 宽相位 + 窄相位 |
+| 渲染 | < 4ms | Canvas/WebGL draw |
+| UI 更新 | < 1ms | React 差异更新 |
+| **总计** | **< 16.67ms** | |
+
+- 用 `performance.now()` 在关键段落插桩测量。
+- Apollo 的 Tracer 已有计时功能（src/debug/tracer.ts）。
+
+## GC 回避
+
+JavaScript GC 是 stop-the-world — 一次 minor GC 5-10ms，major GC 50ms+。
+
+### 避免在热路径创建对象
+
+```typescript
+// ❌ 每 tick 创建新对象
+function tick() { const pos = { x: e.x, y: e.y }; ... }
+
+// ✅ 预分配复用
+const _pos = { x: 0, y: 0 };
+function tick() { _pos.x = e.x; _pos.y = e.y; ... }
+```
+
+### 避免在热路径创建数组
+
+```typescript
+// ❌ 每帧 filter 创建新数组
+const alive = entities.filter(e => e.active);
+
+// ✅ 原地遍历
+for (const e of entities) { if (!e.active) continue; ... }
+```
+
+### 对象池
+
+- 子弹、粒子、伤害数字用池。
+- 池大小 = 同屏最大数量 × 1.5（留余量）。
+- 复用时 reset 所有字段，不要依赖默认值。
+
+## 批处理
+
+### 渲染批处理
+- 相同纹理的精灵合并为一次 draw call。
+- Canvas2D：按 textureKey 排序后连续绘制。
+- WebGL/PixiJS：自动 batch，只要不切换纹理/shader。
+
+### System 批处理
+- 一个 System 遍历所有匹配实体 — 比每个实体跑所有 System 缓存友好。
+- 组件数据紧凑排列：同类型组件存在连续数组里（Structure of Arrays）。
+
+## 数据导向设计（DoD）
+
+- CPU 缓存行 = 64 字节。数据连续排列 → 缓存命中率高 → 速度快。
+- ECS 天然适合 DoD：System 遍历同类组件 = 顺序读内存。
+- 实际影响：1000 实体时 DoD 比 OOP 快 2-5 倍；10000 实体时快 10 倍+。
+
+### SoA vs AoS
+
+```typescript
+// AoS (Array of Structures) — 当前 Apollo 方式
+entities = [ { x: 1, y: 2, vx: 3, vy: 4 }, { x: 5, y: 6, vx: 7, vy: 8 } ]
+
+// SoA (Structure of Arrays) — 更缓存友好
+xs = [1, 5]; ys = [2, 6]; vxs = [3, 7]; vys = [4, 8];
+```
+
+- SoA 在 JS 里用 TypedArray（Float32Array）效果最好。
+- Apollo 当前用 AoS（Map<EntityId, Component>），百实体级够用。千实体级考虑 SoA。
+
+## 空间分区复杂度
+
+| 数据结构 | 构建 | 查询 | 适合 |
+|---------|------|------|------|
+| 暴力遍历 | O(1) | O(n²) | < 50 实体 |
+| 网格分区 | O(n) | O(1) 邻居 | 均匀分布 |
+| AABB 树 | O(n log n) | O(log n) | 大小差异大 |
+| 四叉树 | O(n log n) | O(log n) | 稀疏分布 |
+
+## 性能剖析工具
+
+| 工具 | 用途 |
+|------|------|
+| Chrome DevTools Performance | 火焰图、帧时间线 |
+| Chrome DevTools Memory | 堆快照、分配追踪 |
+| `performance.now()` | 手动插桩计时 |
+| `performance.mark/measure` | 命名标记，DevTools 可视化 |
+| Apollo Tracer | System 级别计时 |
+| `--js-flags="--trace-gc"` | Node.js GC 日志 |
+
+## 渐进式优化路径
+
+1. **先让它跑起来** — 正确性优先。
+2. **量测** — 用 profiler 找到最慢的那 20%。
+3. **算法优化** — O(n²) → O(n log n)，空间分区。
+4. **减少分配** — 对象池、预分配、避免临时对象。
+5. **批处理** — 渲染合批、System 遍历优化。
+6. **数据布局** — SoA、TypedArray（只在真正需要时）。
+
+## 常见陷阱
+
+- 过早优化：SoA + TypedArray 在 100 实体时没有意义，反而降低可读性。
+- JSON.parse 大文件阻塞主线程 — 用 Worker 或流式解析。
+- `Array.sort` 对小数组用插入排序 — 但大数组 V8 用 TimSort，不稳定。渲染排序需要稳定排序。
+- requestAnimationFrame 回调里做太多事 — 把逻辑放 tick，rAF 只做渲染。
+
+## 前沿技术
+
+- **OffscreenCanvas + Worker**：渲染在独立线程，主线程只跑逻辑。
+- **SharedArrayBuffer**：主线程和 Worker 共享内存，零拷贝。适合 SoA 组件数据。
+- **WebAssembly (WASM)**：C/Rust 编译到 WASM，物理和碰撞计算提速 5-10 倍。
+- **WebGPU Compute**：GPU 通用计算，适合大规模粒子/流体模拟。
+- **Scheduling API (scheduler.postTask)**：按优先级调度任务，避免低优先级任务阻塞渲染。
+
+## 参考来源
+
+- Mike Acton CppCon 2014 — 数据导向设计的核心思想（1小时视频）
+- Factorio 技术博客 — 百万实体级优化的真实案例
+- Chrome DevTools Performance 文档 — 帧剖析和内存分析教程
+
+
+# ──────────────────────────────────────────────────────────
+# FILE: wiki/skills/asset-loading.md
+# ──────────────────────────────────────────────────────────
+
+# 资源加载模块知识
+
+> 覆盖：纹理图集、预加载、异步加载、资源管理
+
+## 核心原则
+
+- 所有资源异步加载 — 游戏不能因为一张图没加载完就卡住。
+- 加载状态要可查询：loading / loaded / failed，UI 可以显示进度条。
+- 加载完的资源缓存复用 — 同一张图只 fetch/decode 一次。
+
+## 资源类型与加载方式
+
+| 类型 | API | 注意 |
+|------|-----|------|
+| 图片 | `new Image()` + onload / `fetch` + `createImageBitmap` | createImageBitmap 不阻塞主线程 |
+| 音频 | `fetch` + `AudioContext.decodeAudioData` | 必须在用户交互后 |
+| JSON | `fetch` + `response.json()` | 大 JSON 用 Worker 解析 |
+| 瓦片地图 | `fetch` JSON + 关联图块集图片 | 有依赖链 |
+| 字体 | CSS `@font-face` + `document.fonts.ready` | 必须等加载完再渲染文字 |
+| Spine/Live2D | 专用 loader + 骨骼数据 + 纹理 | 多文件依赖 |
+
+## 预加载队列
+
+```typescript
+interface AssetManifest {
+  images: { key: string; url: string }[];
+  audio: { key: string; url: string }[];
+  data: { key: string; url: string }[];
+}
+
+class AssetLoader {
+  private cache: Map<string, any>;
+  async loadAll(manifest: AssetManifest, onProgress: (pct: number) => void): Promise<void>;
+  get<T>(key: string): T;
+}
+```
+
+- 场景切换前加载下一关的资源，加载完再切。
+- 进度回调：已完成数 / 总数 → 进度条百分比。
+- 并发控制：同时最多 4-6 个请求（避免浏览器限制和带宽争抢）。
+
+## 纹理图集（Texture Atlas / Spritesheet）
+
+- 把多张小图合并成一张大图 + 一份 JSON 描述（每张小图的位置和尺寸）。
+- 优点：减少 HTTP 请求、WebGL 下减少纹理切换、提高 GPU 缓存命中。
+- 工具：TexturePacker、ShoeBox、free-tex-packer。
+
+```json
+{
+  "frames": {
+    "player_idle_0": { "x": 0, "y": 0, "w": 32, "h": 32 },
+    "player_idle_1": { "x": 32, "y": 0, "w": 32, "h": 32 },
+    "enemy_walk_0": { "x": 64, "y": 0, "w": 32, "h": 32 }
+  },
+  "meta": { "image": "atlas.png", "size": { "w": 256, "h": 256 } }
+}
+```
+
+- Sprite 组件的 textureKey 指向图集中的帧名（如 "player_idle_0"）。
+
+## 资源缓存策略
+
+| 策略 | 适合 | 实现 |
+|------|------|------|
+| 全量预加载 | 小游戏（< 10MB） | 启动时加载全部，一次加载 |
+| 按场景加载 | 中型游戏 | 场景切换时加载该场景资源 |
+| 按需懒加载 | 大型游戏 | 进入视野再加载，显示占位符 |
+| LRU 淘汰 | 内存紧张 | 最久未用的资源释放 |
+
+- 微信小游戏内存限制：iOS ~1GB, Android ~512MB。超限会被系统杀掉。
+- 释放资源：`URL.revokeObjectURL`、`imageBitmap.close()`、`audioBuffer = null`。
+
+## 热更新（Hot Reload）
+
+- 开发阶段：Vite HMR 自动刷新代码，但资源（图片/音频）需要手动 reload。
+- 生产阶段：资源 URL 带 hash（`atlas.abc123.png`），浏览器缓存不过期。
+- 微信小游戏：用 `wx.downloadFile` + 本地缓存，版本号变化时重新下载。
+
+## 加载屏设计
+
+- 最小加载屏：Logo + 进度条。进度条要动 — 静止的进度条让玩家以为卡了。
+- 假进度：前 90% 线性推进，最后 10% 等真正加载完。玩家感知更流畅。
+- 加载提示：显示游戏小贴士（"按住跳跃键可以跳得更高"），利用等待时间。
+
+## 常见陷阱
+
+- 图片跨域：Canvas 使用跨域图片后 `getImageData` 报错。设 `img.crossOrigin = 'anonymous'`。
+- 音频预加载触发 autoplay 限制 — 只 fetch + decode，不 play。
+- 加载失败没有重试 — 网络波动时资源丢失。加 retry 逻辑（最多 3 次）。
+- 内存泄漏：旧场景的资源没释放，新场景又加载新的 → 内存持续增长。
+
+## 前沿技术
+
+- **Import Maps + ES Modules**：浏览器原生模块加载，资源也可以用 `import` 管理。
+- **Compression Streams API**：浏览器原生 gzip/deflate 解压，压缩资源包体积。
+- **AVIF 图片格式**：比 PNG 小 50-90%，WebP 的下一代。Chrome/Firefox 已支持。
+- **Cache API (Service Worker)**：精确控制资源缓存策略，支持离线游戏。
+
+## 参考来源
+
+- TexturePacker — 图集打包的行业标准工具
+- Phaser AssetLoader — 游戏资源加载的成熟实现参考
+- MDN createImageBitmap — 非阻塞图片解码 API
+
+
+# ──────────────────────────────────────────────────────────
+# FILE: wiki/skills/particles.md
+# ──────────────────────────────────────────────────────────
+
+# 粒子系统模块知识
+
+> 覆盖：粒子发射器、粒子池、视觉特效
+
+## 核心原则
+
+- 粒子 = 大量短生命周期的简单实体（位置 + 速度 + 颜色 + 生命值）。
+- 粒子不是 ECS 实体 — 数量太多（几百到几千），单独管理用专用数据结构。
+- 粒子纯视觉，不参与碰撞和游戏逻辑。
+
+## 粒子发射器
+
+```typescript
+interface ParticleEmitter {
+  x: number; y: number;            // 发射位置
+  rate: number;                     // 每秒发射数
+  maxParticles: number;             // 池大小
+  lifetime: { min: number; max: number };       // 粒子寿命（tick）
+  speed: { min: number; max: number };          // 初始速度范围
+  angle: { min: number; max: number };          // 发射角度范围
+  gravity: number;                  // 粒子受的重力
+  color: { start: number; end: number };        // 颜色渐变
+  alpha: { start: number; end: number };        // 透明度渐变
+  scale: { start: number; end: number };        // 大小渐变
+}
+```
+
+- 每 tick：按 rate 生成新粒子 → 更新所有活粒子（位移 + 衰减）→ 移除死粒子。
+- 发射形状：点发射、圆形发射、矩形发射、沿线段发射。
+
+## 粒子池（必须）
+
+- 预分配固定数量的粒子对象，用环形缓冲区或空闲列表管理。
+- 发射时从池里取，死亡时归还。
+- 池满时策略：丢弃新粒子 / 回收最老的粒子。
+
+```typescript
+// SoA 布局（Structure of Arrays）— 粒子最适合这种布局
+const MAX = 1000;
+const xs = new Float32Array(MAX);
+const ys = new Float32Array(MAX);
+const vxs = new Float32Array(MAX);
+const vys = new Float32Array(MAX);
+const lives = new Float32Array(MAX);  // 剩余生命，0 = 死亡
+let count = 0;
+```
+
+- Float32Array 连续内存布局 → CPU 缓存友好 → 遍历快。
+
+## 常见特效配方
+
+| 特效 | 参数要点 |
+|------|---------|
+| **爆炸** | 全方向（0-360°）、高初速、短寿命、红→橙→黄渐变 |
+| **烟雾** | 向上缓慢飘动、低初速、长寿命、灰色→透明 |
+| **火花** | 窄角度发射、高初速、受重力、黄→白 |
+| **落叶** | 随机角度、极低速、正弦横向摆动、长寿命 |
+| **血溅** | 受击方向扇形、中速、受重力、红色 |
+| **尘土** | 着地时向两侧发射、低速、短寿命、棕色→透明 |
+| **拖尾** | 跟随实体位置发射、零初速、短寿命、渐隐 |
+
+## 渲染
+
+### Canvas2D
+- 每个粒子一次 `fillRect` 或 `drawImage`。
+- 1000 个 1px 方块粒子在 Canvas2D 上性能可接受。
+- 有纹理的粒子用预渲染的小图。
+
+### WebGL / PixiJS
+- 粒子用 point sprite 或 instanced rendering — 一次 draw call 画全部。
+- PixiJS 有 `@pixi/particle-emitter` 插件。
+- 性能：WebGL 下 10000+ 粒子无压力。
+
+## 与 ECS 的集成方式
+
+粒子系统不放在 ECS tick 循环里，而是作为渲染层的附属：
+
+1. ECS 事件触发粒子：碰撞 → 火花，死亡 → 爆炸，跳跃 → 尘土。
+2. 通过事件组件传递：`{ type: 'ParticleRequest', effect: 'explosion', x, y }`。
+3. 渲染层的粒子管理器消费请求，独立更新和渲染。
+4. 粒子 tick 可以和 ECS tick 同步，也可以用自己的更新频率。
+
+## 高级技术
+
+### 曲线编辑器
+- 粒子属性（速度、大小、颜色、透明度）随生命周期变化，用曲线控制。
+- 开发工具：可视化曲线编辑器，实时预览效果。
+
+### 子发射器
+- 粒子死亡时触发新的发射器 — 烟花（上升粒子 → 爆炸粒子）。
+
+### 力场
+- 粒子受外部力场影响：风、漩涡、吸引点。
+- 实现：每 tick 给粒子加额外加速度。
+
+## 常见陷阱
+
+- 粒子太多导致 Canvas2D 卡顿 — 超过 500 个就要考虑 WebGL。
+- 粒子位置用浮点但渲染用整数 — 可能看起来"抖动"。渲染时 Math.round。
+- 粒子的随机参数必须用确定性 PRNG — 否则联机时两端粒子不同步（如果粒子影响游戏性的话）。
+- 纯视觉粒子可以用 Math.random — 不影响确定性，两端不同也没关系。
+
+## 前沿技术
+
+- **GPU 粒子 (WebGPU Compute)**：粒子更新和渲染全在 GPU，百万粒子级别。
+- **Signed Distance Field (SDF) 粒子**：用 SDF 做粒子形状，支持 metaball 效果（水滴融合）。
+- **粒子 LOD**：远处粒子合并或降频更新，近处保持高精度。
+
+## 参考来源
+
+- *Juice it or Lose it* (GDC 2012) — 粒子效果对游戏手感的影响
+- PixiJS particle-emitter — Web 端粒子系统的成熟库
+- Dead Cells 视觉反馈 — 2D 动作游戏粒子效果的标杆
+

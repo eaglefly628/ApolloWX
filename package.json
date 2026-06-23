@@ -1,0 +1,30 @@
+{
+  "name": "apollo-wx-engine",
+  "version": "0.1.0",
+  "description": "Apollo 数据驱动 ECS 游戏引擎 —— 微信小游戏版",
+  "author": "Apollo Game Studio",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "demo": "vite-node src/assembly/demo.run.ts",
+    "build:weapp": "node scripts/build-weapp.mjs",
+    "build:weapp:min": "node scripts/build-weapp.mjs --minify",
+    "build": "tsc --noEmit && node scripts/build-weapp.mjs"
+  },
+  "dependencies": {
+    "three": "^0.184.0"
+  },
+  "devDependencies": {
+    "@types/node": "^25.9.3",
+    "@types/three": "^0.184.1",
+    "esbuild": "^0.24.0",
+    "happy-dom": "^20.10.6",
+    "typescript": "^5.5.3",
+    "vite": "^5.4.2",
+    "vite-node": "^2.0.5",
+    "vitest": "^2.0.5"
+  }
+}

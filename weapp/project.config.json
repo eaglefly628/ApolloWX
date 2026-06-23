@@ -1,0 +1,16 @@
+{
+  "appid": "touristappid",
+  "projectname": "ApolloWX",
+  "description": "Apollo 数据驱动 ECS 引擎 —— 微信小游戏版",
+  "compileType": "game",
+  "setting": {
+    "es6": false,
+    "minified": false,
+    "postcss": false,
+    "ignoreUploadUnusedFiles": true
+  },
+  "libVersion": "latest",
+  "packOptions": {
+    "ignore": []
+  }
+}

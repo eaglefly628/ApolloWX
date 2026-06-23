@@ -1,0 +1,16 @@
+node_modules/
+dist/
+dist-weapp/
+
+# 微信小游戏构建产物（由 npm run build:weapp 生成）
+weapp/game.js
+weapp/game.js.map
+
+# 微信开发者工具本地配置
+weapp/project.private.config.json
+
+# 杂项
+*.log
+.DS_Store
+.vscode/
+.idea/
