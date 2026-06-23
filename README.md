@@ -179,9 +179,13 @@ UI **也是数据**：一棵 `LayoutNode` 树（控件类型取自闭集、事�
 
 - `src/ui/layout.ts` —— 纯布局引擎：`LayoutNode` 树 → 每个节点的绝对矩形（row/column/grid、flex、gap、
   padding、绝对定位）。无 canvas/DOM，**node 可单测**。
-- `src/ui/canvas-ui.ts` —— `CanvasUI`：把布局结果画到 Canvas2D，并按上次布局做触摸命中 → 返回信号名。
-  v1 控件：Screen / Panel / Label / Button / Badge / Tag / Divider / ProgressBar / Table（其余按同一接口续补）。
-- `src/platform/wechat/ui.ts` —— `createWechatUI()`：上屏画布 + 触摸派发，把信号名交给 `handlers`。
+- `src/ui/canvas-ui.ts` —— `CanvasUI`：把布局结果画到 Canvas2D，并按"热区"做触摸命中。
+  **已与网页解释器全对齐（20 控件）**：Screen / Panel / Label / Button / Badge / Tag / Divider /
+  ProgressBar / Table / Tabs / Modal / Toast / Checkbox / Toggle / RadioGroup / Dropdown / Slider /
+  Input / Image / Dropdown 弹层。
+- `src/platform/wechat/ui.ts` —— `createWechatUI()`：上屏画布 + 触摸派发，并实现运行时交互：
+  Tabs 引擎内切页（不重建）、Modal 遮罩/×关闭、Dropdown 浮层选择、Checkbox/Toggle/RadioGroup 信号、
+  Slider 拖动改值、**Input 拉起 wx 原生键盘**、Image 异步加载缓存重绘、`toast()` 定时飘字。
 
 ```ts
 import { createWechatUI } from '@platform/wechat/index.js';
@@ -195,6 +199,9 @@ const app = createWechatUI({
 });
 ```
 
-跑 UI demo：`npm run build:weapp:ui` → 微信开发者工具打开 `weapp/`，可见一个计数器面板，
-点 +1 / −1 / 重置按钮即改数据并重绘（事件全走信号名）。示例 `src/platform/wechat/main-ui.ts`。
+跑 UI demo：`npm run build:weapp:ui` → 微信开发者工具打开 `weapp/`，是一个三页 Tabs（基础/表单/数据），
+覆盖按钮/Toast/Modal、开关/单选/滑块/下拉/输入(原生键盘)、进度条/表格。示例 `src/platform/wechat/main-ui.ts`。
 换皮 = 传一份你自己的 `UITheme` 令牌（同一份 UI 数据，零改解释器）。
+
+> 与网页解释器（`render.ts`→HTML / `server.ts`→DOM）现已**全控件对齐**：数据模型 `types.ts` 逐字共享，
+> 微信只是第三个解释器（canvas）。后续若源库补新控件，这边按同一套"绘制 + 热区"接口跟进即可。

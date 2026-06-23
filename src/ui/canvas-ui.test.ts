@@ -52,7 +52,7 @@ describe('CanvasUI', () => {
     // 用同一布局算出按钮中心。
     const laid = layoutTree(tree, viewport);
     const go = laid.find((l) => l.node.id === 'go')!;
-    expect(ui.hit(go.x + go.w / 2, go.y + go.h / 2)).toEqual({ action: 'start', arg: 'lvl1' });
+    expect(ui.hit(go.x + go.w / 2, go.y + go.h / 2)).toEqual({ kind: 'action', action: 'start', arg: 'lvl1' });
     // 空白处（远离任何可点控件）命中空。
     expect(ui.hit(go.x + go.w / 2, viewport.h - 1)).toBeNull();
   });

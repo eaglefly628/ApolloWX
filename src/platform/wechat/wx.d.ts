@@ -77,6 +77,16 @@ export interface Wx {
   onTouchEnd(cb: (e: WxTouchEvent) => void): void;
   onTouchCancel(cb: (e: WxTouchEvent) => void): void;
 
+  // 原生键盘（文本输入控件用）。
+  showKeyboard(opts: { defaultValue?: string; maxLength?: number; multiple?: boolean; confirmHold?: boolean; confirmType?: string }): void;
+  hideKeyboard(): void;
+  onKeyboardInput(cb: (res: { value: string }) => void): void;
+  offKeyboardInput(cb?: (res: { value: string }) => void): void;
+  onKeyboardConfirm(cb: (res: { value: string }) => void): void;
+  offKeyboardConfirm(cb?: (res: { value: string }) => void): void;
+  onKeyboardComplete(cb: (res: { value: string }) => void): void;
+  offKeyboardComplete(cb?: (res: { value: string }) => void): void;
+
   connectSocket(opts: { url: string; protocols?: string[] }): WxSocketTask;
 
   onShow(cb: () => void): void;

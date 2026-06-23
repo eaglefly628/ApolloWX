@@ -9,5 +9,5 @@ export type {
   TableColumn, TableRow, ProgressBarProps, DropdownProps, InputProps, ImageProps,
 } from './components/types.js';
 export { DEFAULT_THEME } from './theme.js';
-export { layoutTree, hitTest, type Rect, type LaidOut } from './layout.js';
-export { CanvasUI } from './canvas-ui.js';
+export { layoutTree, hitTest, type Rect, type LaidOut, type LayoutOpts } from './layout.js';
+export { CanvasUI, type Hit, type CanvasUIRenderOpts } from './canvas-ui.js';
