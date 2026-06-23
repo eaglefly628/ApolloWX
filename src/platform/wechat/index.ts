@@ -15,10 +15,11 @@ export { WebGLRenderer, type WebGLRendererOptions } from '@renderer/webgl-render
 export { playground3dBlueprint } from '../../assembly/playground3d.assembly.js';
 export { interactive3dBlueprint } from '../../assembly/interactive3d.assembly.js';
 
-// 数据驱动 UI（canvas 解释器 · 无 DOM）。
+// 数据驱动 UI（canvas 解释器 · 无 DOM）+ §4 世界绑定。
 export { createWechatUI, type WechatUI, type WechatUIOptions } from './ui.js';
-export { CanvasUI, DEFAULT_THEME, layoutTree, hitTest } from '@ui/index.js';
-export type { LayoutNode, UITheme, HandlerMap } from '@ui/components/types.js';
+export { CanvasUI, DEFAULT_THEME, layoutTree, hitTest, resolveBindings } from '@ui/index.js';
+export type { LayoutNode, UITheme, HandlerMap, Hit, ResourceReader, ResourceView } from '@ui/index.js';
+export { buildUiWorldBlueprint, economyCapability } from '../../assembly/ui-world.assembly.js';
 
 export { WechatStoragePort } from './storage.js';
 export { WechatAudioPort } from './audio.js';

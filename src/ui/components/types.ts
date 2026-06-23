@@ -39,6 +39,8 @@ export interface LabelProps {
   color?: 'text' | 'sub' | 'dim' | 'jade' | 'gold' | 'ok' | 'warn' | 'danger';
   bold?: boolean;
   mono?: boolean;
+  // §4 世界绑定（红线：只收 Resource id 字符串，不收自由表达式）。设 bind → text 作前缀、追加该资源 current。
+  bind?: string;
 }
 
 export interface DropdownProps {
@@ -135,6 +137,8 @@ export interface ProgressBarProps {
   value: number; max?: number;
   tone?: 'accent' | 'gold' | 'ok' | 'warn' | 'danger';
   label?: string; showValue?: boolean;
+  // §4 世界绑定：设 bind → value=Resource.current、max=Resource.max（只收 Resource id 字符串）。
+  bind?: string;
 }
 
 // ── Tag（可点过滤标签/词条·筛选条大量用）：active 高亮；可点(action·arg=actionArg)；可删(removable 显 ×)。──

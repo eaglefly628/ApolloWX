@@ -58,7 +58,8 @@ npm run build:weapp    # esbuild 打包引擎 → weapp/game.js
 | `npm run build:weapp:3d` | 构建 **3D** demo（**three.js**，自转的 Mesh3D 物件）→ `weapp/game.js` |
 | `npm run build:weapp:3d:min` | 3D（three.js）构建 + 压缩（three 较大，发布建议用此） |
 | `npm run build:weapp:3d-lite` | 3D demo（零依赖原生 WebGL，包小、功能基础） |
-| `npm run build:weapp:ui` | **数据驱动 UI** demo（canvas 解释 LayoutNode 树，点按钮改数据重绘） |
+| `npm run build:weapp:ui` | **数据驱动 UI** demo（三页 Tabs 全控件） |
+| `npm run build:weapp:ui-world` | **UI 即游戏** demo（UI 绑定活的 ECS 世界 · 放置挖矿） |
 | `npm run build:weapp:min` | 2D 构建 + 压缩 |
 | `npm run build` | 类型检查 + 构建微信产物（CI 全绿门槛） |
 
@@ -205,3 +206,27 @@ const app = createWechatUI({
 
 > 与网页解释器（`render.ts`→HTML / `server.ts`→DOM）现已**全控件对齐**：数据模型 `types.ts` 逐字共享，
 > 微信只是第三个解释器（canvas）。后续若源库补新控件，这边按同一套"绘制 + 热区"接口跟进即可。
+
+### 世界绑定（§4）· UI 即游戏
+
+UI 不只是静态面板——可**绑定到活的 ECS 世界**：给 `Label`/`ProgressBar` 加 `bind: <Resource id>`
+（红线：只收 Resource id 字符串，不收自由表达式），值就随世界实时变。`createWechatUI({ bind })` 传入读值器，
+引擎每帧 `engine.subscribe(() => app.refresh())` 重新解析绑定并重绘。
+
+```ts
+const engine = new Engine({ tickRate: 30 });
+engine.load(buildUiWorldBlueprint(pending));            // 世界：能量/金币/采矿力等 Resource + 经济系统
+const read = (id) => /* 在 world 里查 Resource{id} → {current,max} */;
+const app = createWechatUI({
+  root,                                                  // Label{bind:'gold'} / ProgressBar{bind:'energy'} …
+  bind: read,
+  handlers: { mine: () => pending.push('mine') },        // 点击 → 信号入队 → 系统结算 → 资源变 → UI 变
+});
+engine.subscribe(() => app.refresh());
+engine.start();
+```
+
+跑：`npm run build:weapp:ui-world` —— 一个**整屏皆 UI 的放置挖矿小游戏**：能量随时间回复、点"采矿"耗能量产金币、
+攒金币升级采矿力（花费联动）。金币/采矿力/能量/花费全是 `bind` 的 Resource，随世界 tick 实时刷新。
+即「把 UI 当成一个游戏」：UI = 表现 + 输入，世界 = 确定性状态机。示例 `src/platform/wechat/main-ui-world.ts`、
+`src/assembly/ui-world.assembly.ts`。

@@ -1,5 +1,6 @@
 import { CanvasUI, type Hit } from '@ui/canvas-ui.js';
 import { DEFAULT_THEME } from '@ui/theme.js';
+import { resolveBindings, type ResourceReader } from '@ui/bind.js';
 import type { LayoutNode, UITheme, HandlerMap, ToastProps } from '@ui/components/types.js';
 import type { WxCanvas, WxTouchEvent, WxImage } from './wx.js';
 
@@ -12,6 +13,8 @@ export interface WechatUIOptions {
   theme?: UITheme;
   /** 复用已有 canvas（与游戏共用上屏画布做 HUD）；缺省新建一张上屏画布。 */
   canvas?: WxCanvas;
+  /** §4 世界绑定读值器：bind 的 Resource id → 当前值。设了它，绑定节点每次重绘自动反映世界。 */
+  bind?: ResourceReader;
 }
 
 export interface WechatUI {
@@ -21,6 +24,8 @@ export interface WechatUI {
   setRoot(root: LayoutNode): void;
   /** 用当前树重绘。 */
   redraw(): void;
+  /** 同 redraw：世界变化后由引擎循环调用，重新解析绑定并重绘。 */
+  refresh(): void;
   /** 飘字提示（非模态，定时自消）。对应网页 showToast。 */
   toast(text: string, tone?: ToastProps['tone'], duration?: number): void;
   /** 取消触摸监听。 */
@@ -72,8 +77,10 @@ export function createWechatUI(opts: WechatUIOptions): WechatUI {
 
   const redraw = (): void => {
     if (disposed) return;
+    // 有世界绑定则先按当前世界值解析（同一份数据，值随 world 变）。
+    const tree = opts.bind ? resolveBindings(root, opts.bind) : root;
     ctx.clearRect(0, 0, W, H);
-    ui.render(root, viewport, { activeTab, openDropdown: openDropdown ?? undefined, image: imageResolver });
+    ui.render(tree, viewport, { activeTab, openDropdown: openDropdown ?? undefined, image: imageResolver });
     if (currentToast) ui.overlayToast(currentToast.text, currentToast.tone);
   };
 
@@ -172,6 +179,7 @@ export function createWechatUI(opts: WechatUIOptions): WechatUI {
     ui,
     setRoot: (r: LayoutNode) => { root = r; redraw(); },
     redraw,
+    refresh: redraw,
     toast: (text, tone, duration = 2600) => {
       currentToast = { text, tone };
       redraw();

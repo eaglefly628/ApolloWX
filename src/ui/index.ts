@@ -11,3 +11,4 @@ export type {
 export { DEFAULT_THEME } from './theme.js';
 export { layoutTree, hitTest, type Rect, type LaidOut, type LayoutOpts } from './layout.js';
 export { CanvasUI, type Hit, type CanvasUIRenderOpts } from './canvas-ui.js';
+export { resolveBindings, type ResourceView, type ResourceReader } from './bind.js';
