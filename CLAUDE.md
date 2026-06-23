@@ -23,5 +23,6 @@ Apollo 数据驱动 ECS 引擎的**微信小游戏版**。由 [eaglefly628/Apoll
 - 宪法：`docs/design/data-driven-manifesto.md`
 - 引擎总览：`docs/apollo-engine-overview-for-planner.md`
 - 能力库：`src/skills/{atoms,tier1,tier2,tier3}`；组件契约 `src/engine/protocol/components.ts`
-- 微信适配层：`src/platform/wechat/`（`index.ts` 为对外 barrel；`bootstrap.ts` 为引导入口）
+- 微信适配层：`src/platform/wechat/`（`index.ts` 为对外 barrel；`bootstrap.ts`=2D/lite-3D 引导；`three-game.ts`=three.js 3D；`ui.ts`=数据驱动 UI）
+- 数据驱动 UI：`src/ui/`（`components/types.ts` 平台无关数据模型；`layout.ts` 纯布局；`canvas-ui.ts` canvas 解释器）。UI 是数据、事件走信号名、主题是令牌——红线同宣言。
 - 构建：`scripts/build-weapp.mjs`（esbuild → `weapp/game.js`）；小游戏配置 `weapp/game.json`、`weapp/project.config.json`

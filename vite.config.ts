@@ -15,6 +15,7 @@ export default defineConfig({
       '@net': resolve(__dirname, 'src/net'),
       '@runtime': resolve(__dirname, 'src/runtime'),
       '@platform': resolve(__dirname, 'src/platform'),
+      '@ui': resolve(__dirname, 'src/ui'),
     },
   },
   test: {

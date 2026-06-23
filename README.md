@@ -58,6 +58,7 @@ npm run build:weapp    # esbuild 打包引擎 → weapp/game.js
 | `npm run build:weapp:3d` | 构建 **3D** demo（**three.js**，自转的 Mesh3D 物件）→ `weapp/game.js` |
 | `npm run build:weapp:3d:min` | 3D（three.js）构建 + 压缩（three 较大，发布建议用此） |
 | `npm run build:weapp:3d-lite` | 3D demo（零依赖原生 WebGL，包小、功能基础） |
+| `npm run build:weapp:ui` | **数据驱动 UI** demo（canvas 解释 LayoutNode 树，点按钮改数据重绘） |
 | `npm run build:weapp:min` | 2D 构建 + 压缩 |
 | `npm run build` | 类型检查 + 构建微信产物（CI 全绿门槛） |
 
@@ -149,7 +150,11 @@ createWechatThreeGame({
 ```
 
 跑 3D demo：`npm run build:weapp:3d`（或 `:3d:min` 压缩，three 较大）→ 微信开发者工具打开 `weapp/`，
-可见三个自转的 3D 物件（红/绿 box + 蓝 plane），相机自动取景。示例蓝图 `src/assembly/playground3d.assembly.ts`。
+**用手指拖动屏幕即可转动立方体**（触摸交互 demo）。示例蓝图 `src/assembly/interactive3d.assembly.ts`。
+
+> **触摸交互怎么走的**：`wx.onTouch*` → `WechatTouchInputSource` → 确定性命令流 → 单例 `InputQueue` →
+> `drag-rotate` 系统读事件改 `Transform.rotation` → 渲染。即「输入也是数据、由引擎系统解释」。
+> 另有自转版蓝图 `src/assembly/playground3d.assembly.ts`（无需触摸）。
 
 ### 备选：零依赖原生 WebGL（lite）
 
@@ -165,3 +170,31 @@ createWechatGame({ renderer: '3d', blueprint: /* … */ }).start();
 
 > ⚠️ three.js 路径的最终像素需在**微信开发者工具/真机**确认：本仓库已对 three r162 源码做静态分析、
 > 让垫片精确覆盖其 DOM 触点，并验证打包/类型/适配单测全绿；但无 GPU/微信运行时的 CI 里无法渲染真实画面。
+
+## 数据驱动 UI
+
+UI **也是数据**：一棵 `LayoutNode` 树（控件类型取自闭集、事件只出现"信号名字符串"、主题是 `UITheme` 令牌），
+弱模型只填数据，引擎把它解释成像素。这套数据模型直接复用自源引擎（`src/ui/components/types.ts`，平台无关）。
+网页版用 `renderNode`→HTML / `mountUI`→DOM；**微信版换成 canvas 解释器**（无 DOM）：
+
+- `src/ui/layout.ts` —— 纯布局引擎：`LayoutNode` 树 → 每个节点的绝对矩形（row/column/grid、flex、gap、
+  padding、绝对定位）。无 canvas/DOM，**node 可单测**。
+- `src/ui/canvas-ui.ts` —— `CanvasUI`：把布局结果画到 Canvas2D，并按上次布局做触摸命中 → 返回信号名。
+  v1 控件：Screen / Panel / Label / Button / Badge / Tag / Divider / ProgressBar / Table（其余按同一接口续补）。
+- `src/platform/wechat/ui.ts` —— `createWechatUI()`：上屏画布 + 触摸派发，把信号名交给 `handlers`。
+
+```ts
+import { createWechatUI } from '@platform/wechat/index.js';
+
+let n = 0;
+const app = createWechatUI({
+  root: buildUI(n),                       // 一棵 LayoutNode 数据树（见 main-ui.ts）
+  handlers: {                             // 信号名 → 回调（工程师写；布局数据里只有名字）
+    inc: () => { n++; app.setRoot(buildUI(n)); },   // 改数据 → 重绘
+  },
+});
+```
+
+跑 UI demo：`npm run build:weapp:ui` → 微信开发者工具打开 `weapp/`，可见一个计数器面板，
+点 +1 / −1 / 重置按钮即改数据并重绘（事件全走信号名）。示例 `src/platform/wechat/main-ui.ts`。
+换皮 = 传一份你自己的 `UITheme` 令牌（同一份 UI 数据，零改解释器）。

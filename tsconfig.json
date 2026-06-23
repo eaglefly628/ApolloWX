@@ -19,7 +19,8 @@
       "@renderer/*": ["./src/renderer/*"],
       "@net/*": ["./src/net/*"],
       "@runtime/*": ["./src/runtime/*"],
-      "@platform/*": ["./src/platform/*"]
+      "@platform/*": ["./src/platform/*"],
+      "@ui/*": ["./src/ui/*"]
     }
   },
   "include": ["src"],

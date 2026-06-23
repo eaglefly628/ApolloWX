@@ -20,6 +20,7 @@ const alias = {
   '@net': r('src/net'),
   '@runtime': r('src/runtime'),
   '@platform': r('src/platform'),
+  '@ui': r('src/ui'),
 };
 
 // 把 import 里的 ".js" 重解析到对应 ".ts/.tsx" 源（esbuild 默认不做该映射）。
@@ -50,13 +51,15 @@ const jsToTs = {
   },
 };
 
-// 入口选择：--3d 打 three.js 3D demo；--3d-lite 打零依赖 WebGL 3D demo；缺省打 2D demo。
-// 三者都产出 weapp/game.js。
-const entry = process.argv.includes('--3d-lite')
-  ? 'src/platform/wechat/main3d-lite.ts'
-  : process.argv.includes('--3d')
-    ? 'src/platform/wechat/main3d.ts'
-    : 'src/platform/wechat/main.ts';
+// 入口选择：--ui 数据驱动 UI demo；--3d three.js 3D；--3d-lite 零依赖 WebGL 3D；缺省 2D。
+// 都产出 weapp/game.js。
+const entry = process.argv.includes('--ui')
+  ? 'src/platform/wechat/main-ui.ts'
+  : process.argv.includes('--3d-lite')
+    ? 'src/platform/wechat/main3d-lite.ts'
+    : process.argv.includes('--3d')
+      ? 'src/platform/wechat/main3d.ts'
+      : 'src/platform/wechat/main.ts';
 
 await build({
   entryPoints: [r(entry)],

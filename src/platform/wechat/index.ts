@@ -13,6 +13,12 @@ export { installWeappAdapter, patchCanvas } from './adapter.js';
 // 3D（零依赖 lite）：原生 WebGL 后端（createWechatGame({ renderer: '3d', ... }) 即用）。
 export { WebGLRenderer, type WebGLRendererOptions } from '@renderer/webgl-renderer.js';
 export { playground3dBlueprint } from '../../assembly/playground3d.assembly.js';
+export { interactive3dBlueprint } from '../../assembly/interactive3d.assembly.js';
+
+// 数据驱动 UI（canvas 解释器 · 无 DOM）。
+export { createWechatUI, type WechatUI, type WechatUIOptions } from './ui.js';
+export { CanvasUI, DEFAULT_THEME, layoutTree, hitTest } from '@ui/index.js';
+export type { LayoutNode, UITheme, HandlerMap } from '@ui/components/types.js';
 
 export { WechatStoragePort } from './storage.js';
 export { WechatAudioPort } from './audio.js';
